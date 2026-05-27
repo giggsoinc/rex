@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "Rex",
+    "type": "code",
+    "guard": {
+      "enabled": true
+    }
+  },
+  "stack": {
+    "language": ["python3.13"],
+    "frontend": "nicegui",
+    "cloud": "aws",
+    "database": ["postgresql"],
+    "infra": ["docker-compose"]
+  },
+  "changelog": [
+    {
+      "version": "1.0",
+      "changed_by": "rv@giggso.com",
+      "changed_at": "2026-05-26T00:00:00Z",
+      "changes": "Initial project manifest — Rex (python3.13, nicegui, aws, postgresql, docker-compose, guard enabled)",
+      "approved_by": "rv@giggso.com"
+    }
+  ]
+}
