@@ -1,10 +1,7 @@
 """Skip rules — filename patterns + size limits.
 
-Lessons learned from real-world cluster-fuck scans:
-  - Office leaves ~$lock files that crash extractors
-  - macOS sprinkles .DS_Store, Thumbs.db
-  - Random tmp/swap files have no semantic meaning
-  - Huge files (videos, ISOs) blow embed context windows
+Enum + dataclass + functions. The big constant tuples live in
+``rex.utils.skip_constants`` (re-exported here for backwards compat).
 """
 
 from __future__ import annotations
@@ -14,56 +11,24 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
-
-DEFAULT_MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB
-
-
-# Patterns matched via fnmatch on filename (not full path)
-DEFAULT_SKIP_PATTERNS: tuple[str, ...] = (
-    # Office lock / temp files
-    "~$*",
-    ".~lock.*",
-    "*.tmp",
-    "*.temp",
-    "*~",
-    # macOS
-    ".DS_Store",
-    "._*",
-    # Windows
-    "Thumbs.db",
-    "desktop.ini",
-    "ehthumbs.db",
-    # Editor swap
-    ".*.swp",
-    ".*.swo",
-    "*.bak",
-    # Cache / hidden Rex / Git
-    ".cache",
-    ".rex",
-    # Version control
-    ".gitignore",
-    ".gitkeep",
+from rex.utils.skip_constants import (
+    DEFAULT_MAX_FILE_SIZE_BYTES,
+    DEFAULT_SKIP_DIRS,
+    DEFAULT_SKIP_PATTERNS,
+    NON_PROCESSABLE_EXTS,
 )
 
-# Directories to skip entirely during walk
-DEFAULT_SKIP_DIRS: tuple[str, ...] = (
-    ".git", ".hg", ".svn",
-    "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
-    "node_modules", ".npm", ".yarn",
-    ".venv", "venv", "env", ".env",
-    ".raven", ".rex",
-    ".DS_Store",
-    ".cache", ".idea", ".vscode",
-)
-
-# Extensions that have no useful text content for the LLM router (binary blobs)
-NON_PROCESSABLE_EXTS: tuple[str, ...] = (
-    ".iso", ".dmg", ".vmdk", ".vdi",
-    ".exe", ".msi", ".dll", ".so", ".dylib",
-    ".pkg", ".deb", ".rpm",
-    ".class", ".jar", ".war",
-    ".pyc", ".pyo",
-)
+__all__ = [
+    "DEFAULT_MAX_FILE_SIZE_BYTES",
+    "DEFAULT_SKIP_DIRS",
+    "DEFAULT_SKIP_PATTERNS",
+    "NON_PROCESSABLE_EXTS",
+    "SkipReason",
+    "SkipRules",
+    "should_skip",
+    "is_skip_dir",
+    "truncate_for_embedding",
+]
 
 
 class SkipReason(str, Enum):
