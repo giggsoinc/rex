@@ -52,3 +52,7 @@ rex-data/
 # Raven secrets
 .raven/manifest.secrets.json
 .raven/.cache/
+
+# Local env with secrets — never commit
+.env.local
+.env.*.local
