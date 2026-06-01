@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rex Pipeline — Guru Walk-Through</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --border: #334155;
+    --accent: #38bdf8;
+    --accent-2: #a78bfa;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --good: #34d399;
+    --warn: #fbbf24;
+    --code-bg: #0b1220;
+    --table-stripe: #182234;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    line-height: 1.6;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 48px 28px 80px;
+  }
+  header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+  h1 {
+    font-size: 2.4rem;
+    margin: 0 0 8px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  h2 {
+    color: var(--accent);
+    border-left: 4px solid var(--accent);
+    padding-left: 12px;
+    margin-top: 48px;
+    font-size: 1.6rem;
+  }
+  h3 {
+    color: var(--accent-2);
+    margin-top: 32px;
+    font-size: 1.2rem;
+  }
+  .tagline {
+    color: var(--muted);
+    font-size: 1.1rem;
+    margin: 0;
+  }
+  .stage-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+  }
+  .module-line {
+    color: var(--muted);
+    font-size: 0.95rem;
+    margin: 4px 0 18px;
+  }
+  .module-line code {
+    color: var(--accent);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.94rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: var(--code-bg);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  tbody tr:nth-child(even) {
+    background: var(--table-stripe);
+  }
+  td.step {
+    color: var(--accent-2);
+    font-weight: 600;
+    width: 60px;
+    white-space: nowrap;
+  }
+  td.action {
+    width: 40%;
+  }
+  .sub-bullets {
+    margin: 4px 0 0 14px;
+    padding: 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+  .sub-bullets li {
+    list-style: '• ';
+    margin-bottom: 2px;
+  }
+  code {
+    background: var(--code-bg);
+    color: var(--accent);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "JetBrains Mono", "Fira Code", Menlo, monospace;
+    font-size: 0.88rem;
+  }
+  .stage-output {
+    background: rgba(56,189,248,0.08);
+    border-left: 3px solid var(--accent);
+    padding: 10px 16px;
+    margin-top: 12px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+  .stage-output strong { color: var(--good); }
+  .mental-model {
+    background: linear-gradient(135deg, rgba(56,189,248,0.15), rgba(167,139,250,0.15));
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    margin: 36px 0;
+  }
+  .mental-model .one-liner {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 8px 0;
+  }
+  .mental-model .caption {
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+  blockquote {
+    margin: 0;
+    color: var(--accent-2);
+    font-style: italic;
+    font-size: 1.1rem;
+  }
+  .toc {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 24px;
+    margin-bottom: 32px;
+  }
+  .toc h3 {
+    margin-top: 0;
+    color: var(--accent);
+  }
+  .toc ol {
+    margin: 8px 0 0;
+    padding-left: 20px;
+    color: var(--muted);
+  }
+  .toc a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .toc a:hover {
+    text-decoration: underline;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: 6px;
+  }
+  .badge-stage { background: var(--accent); color: var(--bg); }
+  .badge-future { background: var(--warn); color: var(--bg); }
+  .badge-today { background: var(--good); color: var(--bg); }
+  footer {
+    margin-top: 56px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.88rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Rex Pipeline — Guru Walk-Through</h1>
+  <p class="tagline">You point Rex at a folder. From that moment to a clean organized output, every file takes a journey through 3 agents and 4 storage layers.</p>
+</header>
+
+<div class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#master">Master Flow</a></li>
+    <li><a href="#stage1">Stage 1: Scanner Agent</a></li>
+    <li><a href="#stage2">Stage 2: LLM Router Agent</a></li>
+    <li><a href="#stage3">Stage 3: Organizer Agent</a></li>
+    <li><a href="#parallel">Parallel Processing — Today vs Future</a></li>
+    <li><a href="#storage">Quick Reference: Storage Locations</a></li>
+    <li><a href="#mental">Mental Model</a></li>
+  </ol>
+</div>
+
+<h2 id="master">Master Flow</h2>
+<div class="stage-card">
+<table>
+  <thead><tr><th>Stage</th><th>What Happens</th><th>File / Module</th><th>Class / Function</th></tr></thead>
+  <tbody>
+    <tr><td class="step">0</td><td class="action">CLI parses <code>rex scan &lt;folder&gt;</code></td><td><code>src/rex/cli/main.py</code></td><td><code>main()</code></td></tr>
+    <tr><td class="step">0a</td><td class="action">Dispatches to scan command</td><td><code>src/rex/cli/scan.py</code></td><td><code>main()</code> → <code>_run()</code></td></tr>
+    <tr><td class="step">0b</td><td class="action">Loads <code>.env</code> + <code>.env.local</code> + resolves Gemini key</td><td><code>src/rex/config.py</code></td><td><code>get_settings()</code></td></tr>
+    <tr><td class="step">0c</td><td class="action">Builds wired pipeline (agents + stores)</td><td><code>src/rex/orchestrator/builder.py</code></td><td><code>build_default_pipeline()</code></td></tr>
+    <tr><td class="step">0d</td><td class="action">Initializes LanceDB vector store</td><td><code>src/rex/vectorstore/lancedb_store.py</code></td><td><code>LanceDBStore.initialize()</code></td></tr>
+    <tr><td class="step">0e</td><td class="action">Creates or resumes job (idempotent by folder hash)</td><td><code>src/rex/orchestrator/state.py</code></td><td><code>JobStore.create_or_resume_job()</code></td></tr>
+    <tr><td class="step">1</td><td class="action">Orchestrator runs the 3-stage pipeline</td><td><code>src/rex/orchestrator/pipeline.py</code></td><td><code>RexPipeline.run()</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="stage1"><span class="badge badge-stage">Stage 1</span> Scanner Agent <span style="color:var(--muted);font-size:0.7em;">(per file, streaming)</span></h2>
+<div class="stage-card">
+<p class="module-line"><strong>Module:</strong> <code>src/rex/agents/scanner.py</code> &nbsp;·&nbsp; <strong>Class:</strong> <code>LocalScanner</code></p>
+<table>
+  <thead><tr><th>Step</th><th>Action</th><th>File / Module</th><th>Function</th></tr></thead>
+  <tbody>
+    <tr><td class="step">1.1</td>
+      <td class="action">Walk directory (async)
+        <ul class="sub-bullets">
+          <li>Skips <code>.git</code>, <code>.venv</code>, <code>node_modules</code>, hidden</li>
+          <li>Returns one <code>FileEntry</code> at a time (never buffers full dir)</li>
+        </ul>
+      </td>
+      <td><code>src/rex/plugins/local_fs.py</code></td>
+      <td><code>LocalFSPlugin.walk()</code></td>
+    </tr>
+    <tr><td class="step">1.2</td><td class="action">Compute SHA-256 hash (off-thread 64KB chunks)</td><td><code>src/rex/agents/scanner.py</code></td><td><code>sha256_of_file()</code></td></tr>
+    <tr><td class="step">1.3</td>
+      <td class="action">Idempotency check: hash already in job?
+        <ul class="sub-bullets"><li>If yes → skip extraction + embed, reuse existing record</li></ul>
+      </td>
+      <td><code>src/rex/orchestrator/state.py</code></td>
+      <td><code>JobStore.get_file_by_hash()</code></td>
+    </tr>
+    <tr><td class="step">1.4</td><td class="action">Detect MIME type from extension</td><td><code>src/rex/agents/scanner.py</code></td><td><code>detect_mime()</code></td></tr>
+    <tr><td class="step">1.5</td><td class="action">Detect media type (TEXT/IMAGE/VIDEO/AUDIO/ARCHIVE/BINARY)</td><td><code>src/rex/agents/scanner.py</code></td><td><code>detect_media_type()</code></td></tr>
+    <tr><td class="step">1.6</td>
+      <td class="action">Extract text content
+        <ul class="sub-bullets">
+          <li><code>.txt/.md/.json/.csv</code> → direct read</li>
+          <li><code>.pdf/.docx/.pptx/.xlsx</code> → Unstructured.io <code>partition()</code></li>
+          <li>Fallback: regex-grep printable ASCII strings</li>
+          <li>Truncate to <code>REX_MAX_TEXT_CHARS</code> (default 2000)</li>
+        </ul>
+      </td>
+      <td><code>src/rex/agents/scanner.py</code></td>
+      <td><code>extract_text()</code></td>
+    </tr>
+    <tr><td class="step">1.7</td>
+      <td class="action">(Images only) Vision description
+        <ul class="sub-bullets">
+          <li>Calls Gemini Flash if key set</li>
+          <li>Skipped with warning if no key</li>
+        </ul>
+      </td>
+      <td><code>src/rex/ml/vision.py</code></td>
+      <td><code>VisionEngine.describe_image()</code></td>
+    </tr>
+    <tr><td class="step">1.8</td><td class="action">(Images only) EXIF metadata via Pillow</td><td><code>src/rex/agents/scanner.py</code></td><td><code>LocalScanner._read_exif()</code></td></tr>
+    <tr><td class="step">1.9</td><td class="action">Build <code>FileRecord</code> Pydantic model</td><td><code>src/rex/models/schemas.py</code></td><td><code>FileRecord</code></td></tr>
+    <tr><td class="step">1.10</td><td class="action">Persist FileRecord to JSON</td><td><code>src/rex/orchestrator/state.py</code></td><td><code>JobStore.save_file()</code></td></tr>
+    <tr><td class="step">1.11</td>
+      <td class="action">Generate embedding via Ollama
+        <ul class="sub-bullets"><li>Calls <code>all-minilm</code> model (384d vector)</li></ul>
+      </td>
+      <td><code>src/rex/ml/provider.py</code></td>
+      <td><code>ModelProvider.embed()</code></td>
+    </tr>
+    <tr><td class="step">1.12</td>
+      <td class="action">Upsert vector + metadata to LanceDB
+        <ul class="sub-bullets"><li>Cosine-distance index for similarity search</li></ul>
+      </td>
+      <td><code>src/rex/vectorstore/lancedb_store.py</code></td>
+      <td><code>LanceDBStore.upsert()</code></td>
+    </tr>
+    <tr><td class="step">1.13</td><td class="action">Find top-3 neighbors (for Router context)</td><td><code>src/rex/vectorstore/lancedb_store.py</code></td><td><code>LanceDBStore.search()</code></td></tr>
+    <tr><td class="step">1.14</td><td class="action">Collect existing categories from this job</td><td><code>src/rex/orchestrator/state.py</code></td><td><code>JobStore.list_decisions()</code></td></tr>
+    <tr><td class="step">1.15</td><td class="action">Yield <code>FileContext</code> to orchestrator</td><td><code>src/rex/models/schemas.py</code></td><td><code>FileContext</code></td></tr>
+  </tbody>
+</table>
+<div class="stage-output"><strong>Stage 1 output:</strong> A stream of <code>FileContext</code> objects — each carries the file record, embedding, neighbors, and known categories.</div>
+</div>
+
+<h2 id="stage2"><span class="badge badge-stage">Stage 2</span> LLM Router Agent <span style="color:var(--muted);font-size:0.7em;">(per file, intelligence)</span></h2>
+<div class="stage-card">
+<p class="module-line"><strong>Module:</strong> <code>src/rex/agents/router.py</code> &nbsp;·&nbsp; <strong>Class:</strong> <code>LLMRouter</code></p>
+<table>
+  <thead><tr><th>Step</th><th>Action</th><th>File / Module</th><th>Function</th></tr></thead>
+  <tbody>
+    <tr><td class="step">2.1</td>
+      <td class="action">Idempotency: decision already exists?
+        <ul class="sub-bullets"><li>If yes → skip LLM call, reuse decision</li></ul>
+      </td>
+      <td><code>src/rex/orchestrator/state.py</code></td>
+      <td><code>JobStore.get_decision()</code></td>
+    </tr>
+    <tr><td class="step">2.2</td>
+      <td class="action"><strong>Deterministic dedup check first</strong>
+        <ul class="sub-bullets">
+          <li>Look at top neighbor's cosine similarity</li>
+          <li>≥ 0.9999 → <code>EXACT_DUPLICATE</code> → action = TRASH</li>
+          <li>≥ 0.92 → <code>NEAR_DUPLICATE</code> → action = ARCHIVE</li>
+          <li>≥ 0.80 → <code>RELATED</code> → flag only</li>
+        </ul>
+      </td>
+      <td><code>src/rex/agents/router.py</code></td>
+      <td><code>LLMRouter._check_dedup()</code></td>
+    </tr>
+    <tr><td class="step">2.3</td>
+      <td class="action">Build structured prompt for LLM
+        <ul class="sub-bullets">
+          <li>Filename + extension + media_type + size + modified</li>
+          <li>Extracted text (first 1500 chars)</li>
+          <li>Image description (if any)</li>
+          <li>Top-3 similar neighbors with similarity scores</li>
+          <li>Existing categories list</li>
+        </ul>
+      </td>
+      <td><code>src/rex/agents/router.py</code></td>
+      <td><code>build_user_prompt()</code></td>
+    </tr>
+    <tr><td class="step">2.4</td>
+      <td class="action"><strong>LLM call with 3-retry backoff</strong>
+        <ul class="sub-bullets">
+          <li>Calls <code>ModelProvider.generate()</code> with JSON mode</li>
+          <li>Routes to Ollama / Bedrock / Gemini based on <code>REX_LLM_PROVIDER</code></li>
+          <li>Local default: qwen3:8b via Ollama</li>
+        </ul>
+      </td>
+      <td><code>src/rex/agents/router.py</code></td>
+      <td><code>LLMRouter._classify_with_retry()</code></td>
+    </tr>
+    <tr><td class="step">2.5</td><td class="action">Parse model output (strips markdown fences, regex-finds JSON)</td><td><code>src/rex/agents/router.py</code></td><td><code>extract_json()</code></td></tr>
+    <tr><td class="step">2.6</td>
+      <td class="action">Validate against <code>FileDecision</code> schema
+        <ul class="sub-bullets">
+          <li>category, tags[], relevance 1-5, action, reasoning</li>
+          <li>Pydantic raises on invalid → retry</li>
+        </ul>
+      </td>
+      <td><code>src/rex/models/schemas.py</code></td>
+      <td><code>FileDecision</code></td>
+    </tr>
+    <tr><td class="step">2.7</td><td class="action">Normalize fields (sanitize category, lowercase tags)</td><td><code>src/rex/agents/router.py</code></td><td><code>LLMRouter._build_decision()</code></td></tr>
+    <tr><td class="step">2.8</td>
+      <td class="action">Overlay dedup result on LLM decision
+        <ul class="sub-bullets"><li>Dedup wins: TRASH for exact, ARCHIVE for near-dup</li></ul>
+      </td>
+      <td><code>src/rex/agents/router.py</code></td>
+      <td><code>LLMRouter.route()</code></td>
+    </tr>
+    <tr><td class="step">2.9</td>
+      <td class="action">Fallback if all retries fail
+        <ul class="sub-bullets">
+          <li>Heuristic category from extension</li>
+          <li>Mark <code>unclassified</code> tag, relevance=3</li>
+        </ul>
+      </td>
+      <td><code>src/rex/agents/router.py</code></td>
+      <td><code>LLMRouter._fallback_decision()</code></td>
+    </tr>
+    <tr><td class="step">2.10</td><td class="action">Persist <code>FileDecision</code> to JSON</td><td><code>src/rex/orchestrator/state.py</code></td><td><code>JobStore.save_decision()</code></td></tr>
+    <tr><td class="step">2.11</td><td class="action">Brief sleep (50ms) to keep Ollama happy</td><td><code>src/rex/orchestrator/pipeline.py</code></td><td><code>asyncio.sleep(0.05)</code></td></tr>
+  </tbody>
+</table>
+<div class="stage-output"><strong>Stage 2 output:</strong> A <code>FileDecision</code> per file persisted on disk.</div>
+</div>
+
+<h2 id="stage3"><span class="badge badge-stage">Stage 3</span> Organizer Agent <span style="color:var(--muted);font-size:0.7em;">(per file, physical placement)</span></h2>
+<div class="stage-card">
+<p class="module-line"><strong>Module:</strong> <code>src/rex/agents/organizer.py</code> &nbsp;·&nbsp; <strong>Class:</strong> <code>LocalOrganizer</code></p>
+<table>
+  <thead><tr><th>Step</th><th>Action</th><th>File / Module</th><th>Function</th></tr></thead>
+  <tbody>
+    <tr><td class="step">3.1</td>
+      <td class="action">Pick destination folder
+        <ul class="sub-bullets">
+          <li>action=TRASH → <code>_Trash/&lt;category&gt;/</code></li>
+          <li>action=ARCHIVE → <code>_Archive/&lt;category&gt;/</code></li>
+          <li>action=KEEP + relevance≤2 → <code>_Flagged/&lt;category&gt;/</code></li>
+          <li>action=KEEP + relevance≥3 → <code>&lt;category&gt;/</code></li>
+        </ul>
+      </td>
+      <td><code>src/rex/agents/organizer.py</code></td>
+      <td><code>LocalOrganizer.organize()</code></td>
+    </tr>
+    <tr><td class="step">3.2</td>
+      <td class="action">Sanitize category to safe path
+        <ul class="sub-bullets"><li>Strip spaces, special chars; keep slashes for nesting</li></ul>
+      </td>
+      <td><code>src/rex/agents/organizer.py</code></td>
+      <td><code>safe_path_segment()</code></td>
+    </tr>
+    <tr><td class="step">3.3</td>
+      <td class="action">Conflict resolution (same name, different hash)
+        <ul class="sub-bullets"><li>Suffix filename with first 8 chars of SHA-256</li></ul>
+      </td>
+      <td><code>src/rex/agents/organizer.py</code></td>
+      <td><code>LocalOrganizer.organize()</code></td>
+    </tr>
+    <tr><td class="step">3.4</td>
+      <td class="action">Copy file (never move)
+        <ul class="sub-bullets"><li>Uses <code>shutil.copy2</code> in thread pool to preserve metadata</li></ul>
+      </td>
+      <td><code>src/rex/plugins/local_fs.py</code></td>
+      <td><code>LocalFSPlugin.copy()</code></td>
+    </tr>
+    <tr><td class="step">3.5</td>
+      <td class="action">Write metadata sidecar
+        <ul class="sub-bullets">
+          <li><code>_metadata/&lt;hash[:16]&gt;.json</code> per file</li>
+          <li>Full FileRecord + FileDecision + organized_at timestamp</li>
+        </ul>
+      </td>
+      <td><code>src/rex/agents/organizer.py</code></td>
+      <td><code>LocalOrganizer.organize()</code></td>
+    </tr>
+  </tbody>
+</table>
+<p style="color:var(--muted);margin-top:18px;">After ALL files placed, <code>finalize()</code> builds the catalog:</p>
+<table>
+  <thead><tr><th>Step</th><th>Action</th><th>File / Module</th><th>Function</th></tr></thead>
+  <tbody>
+    <tr><td class="step">3.6</td><td class="action">Generate <code>_catalog/overview.md</code></td><td><code>src/rex/agents/organizer.py</code></td><td><code>_write_overview_md()</code></td></tr>
+    <tr><td class="step">3.7</td><td class="action">Generate <code>_catalog/index.md</code> (master table)</td><td><code>src/rex/agents/organizer.py</code></td><td><code>_write_index_md()</code></td></tr>
+    <tr><td class="step">3.8</td><td class="action">Generate <code>_catalog/categories.md</code> (tree by category)</td><td><code>src/rex/agents/organizer.py</code></td><td><code>_write_categories_md()</code></td></tr>
+    <tr><td class="step">3.9</td><td class="action">Generate <code>_catalog/tags.md</code> (tag cloud)</td><td><code>src/rex/agents/organizer.py</code></td><td><code>_write_tags_md()</code></td></tr>
+    <tr><td class="step">3.10</td><td class="action">Generate <code>_catalog/duplicates.md</code> (review list)</td><td><code>src/rex/agents/organizer.py</code></td><td><code>_write_duplicates_md()</code></td></tr>
+  </tbody>
+</table>
+<div class="stage-output"><strong>Stage 3 output:</strong> Organized folder + sidecars + 5 catalog markdown files.</div>
+</div>
+
+<h2 id="parallel">Parallel Processing — Today vs Future</h2>
+<div class="stage-card">
+
+<h3><span class="badge badge-today">Today</span> Sequential per file</h3>
+<ul style="color:var(--muted);">
+  <li>Files are scanned one at a time (limited by LocalFSPlugin)</li>
+  <li>Routing is sequential (one LLM call at a time)</li>
+  <li>Organizing is sequential (one copy at a time)</li>
+</ul>
+
+<h3>Already plumbed — just needs flipping on</h3>
+<table>
+  <thead><tr><th>Parallel Job</th><th>Where</th><th>Trigger</th></tr></thead>
+  <tbody>
+    <tr><td>Concurrent Ollama LLM calls</td><td><code>src/rex/ml/provider.py</code> <code>embed_batch()</code></td><td>Already supports <code>REX_OLLAMA_PARALLEL=N</code></td></tr>
+    <tr><td>Concurrent embeddings</td><td><code>src/rex/ml/provider.py</code> <code>embed_batch()</code></td><td>Same env var</td></tr>
+    <tr><td>Concurrent scanning + extraction</td><td>Needs <code>asyncio.gather()</code> in <code>RexPipeline.run()</code></td><td>Easy refactor</td></tr>
+    <tr><td>Concurrent vision calls</td><td><code>src/rex/ml/vision.py</code></td><td>One Gemini call per image — naturally batch-able</td></tr>
+  </tbody>
+</table>
+
+<h3><span class="badge badge-future">Future</span> Prefect-based parallelism</h3>
+<ul style="color:var(--muted);">
+  <li>Each file is a Prefect task → all 500 files fan out across N workers</li>
+  <li>Retry policies per file</li>
+  <li>Resume from any failed task</li>
+  <li>Observability dashboard</li>
+</ul>
+</div>
+
+<h2 id="storage">Quick Reference: The 7 Storage Locations</h2>
+<div class="stage-card">
+<table>
+  <thead><tr><th>Where</th><th>What Lives Here</th></tr></thead>
+  <tbody>
+    <tr><td><code>~/rex-data/jobs/&lt;job_id&gt;/job.json</code></td><td>Top-level job state</td></tr>
+    <tr><td><code>~/rex-data/jobs/&lt;job_id&gt;/files/*.json</code></td><td>One FileRecord per file scanned</td></tr>
+    <tr><td><code>~/rex-data/jobs/&lt;job_id&gt;/decisions/*.json</code></td><td>One FileDecision per file classified</td></tr>
+    <tr><td><code>~/rex-data/vectors.lance/</code></td><td>LanceDB Parquet — embeddings + metadata</td></tr>
+    <tr><td><code>~/rex-data/output/&lt;category&gt;/*</code></td><td>Organized copies of your files</td></tr>
+    <tr><td><code>~/rex-data/output/_metadata/*.json</code></td><td>Per-file sidecars (full provenance)</td></tr>
+    <tr><td><code>~/rex-data/output/_catalog/*.md</code></td><td>5 Obsidian-compatible browse files</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div id="mental" class="mental-model">
+  <div class="caption">The one-line mental model</div>
+  <div class="one-liner">Walk → Hash → Extract → Embed → Find Neighbors → Ask LLM → Validate → Dedup → Place → Catalog</div>
+  <div class="caption">Every file. Every time. Resumable. Idempotent. Source folder untouched.</div>
+</div>
+
+<footer>
+  Rex · Multi-agent Data Cleanup &amp; Knowledge Management · Phase 1 (Local Mode)
+</footer>
+
+</div>
+</body>
+</html>

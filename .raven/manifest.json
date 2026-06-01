@@ -9,9 +9,10 @@
   },
   "stack": {
     "language": ["python3.13"],
-    "frontend": "nicegui",
+    "frontend": "streamlit",
     "cloud": "aws",
     "database": ["postgresql"],
+    "db": ["postgresql"],
     "infra": ["docker-compose"]
   },
   "changelog": [

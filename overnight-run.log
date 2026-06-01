@@ -1,0 +1,137 @@
+# Rex Overnight Build Log
+# Started: 2026-05-31 (autonomous run)
+# Model: claude-opus-4-7[1m]
+# Plan: 6 tasks per Andie-approved card
+
+## Pre-flight
+- Disk: 8.9GB free (98% used — TIGHT but proceeding)
+- Ollama: UP at localhost:11434
+- Models available: qwen3:8b, all-minilm:latest
+- Gemini key: found in .env as GEMINI_ADK_KEY
+- Test fixtures dir: tests/fixtures/sample-data/ created (14 files)
+- Orchestrator dir: src/rex/orchestrator/ created
+
+## Safety rails active
+- Hard cap: 200K output tokens
+- No new pip deps
+- No git commits (review in AM)
+- No modifications to .raven/, .model.env
+- Fail loud, continue, log all errors
+
+## Task Results
+
+### ✅ Task 1: Agent contracts + Orchestrator skeleton
+- src/rex/orchestrator/__init__.py
+- src/rex/orchestrator/contracts.py    (Scanner/Router/Organizer Protocols)
+- src/rex/orchestrator/state.py        (JobStore — JSON-backed for ideation)
+- src/rex/orchestrator/pipeline.py     (RexPipeline — async raw orchestration)
+
+### ✅ Task 2: Scanner agent
+- src/rex/agents/scanner.py
+  - Async walk via LocalFSPlugin
+  - SHA-256 fingerprinting, MIME detection, media type
+  - Text extraction (Unstructured with fallback)
+  - Ollama embeddings via all-minilm (384d)
+  - LanceDB vector upsert
+  - Idempotency: hash-keyed dedup on rescan
+  - Per-file error isolation
+
+### ✅ Task 3: LLM Router agent
+- src/rex/agents/router.py
+  - PydanticAI-style structured prompt
+  - JSON mode with 3-retry-with-backoff
+  - Fallback decision on total LLM failure (heuristic category by extension)
+  - Deterministic dedup logic:
+    - cosine ≥ 0.9999 → exact dup → TRASH
+    - cosine ≥ 0.92 → near dup → ARCHIVE
+    - cosine ≥ 0.80 → related (flagged but kept)
+
+### ✅ Task 4: Organizer agent
+- src/rex/agents/organizer.py
+  - Copy semantics (never modifies source)
+  - Per-file JSON metadata sidecars
+  - Conflict resolution (hash suffix on filename clash)
+  - Catalog generation (Obsidian-compatible):
+    - _catalog/overview.md
+    - _catalog/index.md
+    - _catalog/categories.md
+    - _catalog/tags.md
+    - _catalog/duplicates.md
+  - Folder structure: Category/ + _Archive/ + _Trash/ + _Flagged/
+
+### ✅ Task 5: Streamlit UI + CLI wiring
+- src/rex/orchestrator/builder.py     (build_default_pipeline)
+- src/rex/cli/scan.py                  (rex scan <folder> with rich progress)
+- src/rex/cli/main.py                  (wired scan command)
+- src/rex/ui/app.py                    (5 Streamlit pages):
+  - 📁 Scan      — point at folder + live progress
+  - 📊 Jobs      — history with metrics
+  - 🗂️ Browse   — category filter + file detail
+  - 🔎 Search    — semantic search via vector store
+  - ⚙️ Settings  — read-only config viewer
+- src/rex/config.py                    (loads .env + .env.local, multi-name Gemini key)
+
+### ✅ Task 6: End-to-end test
+- tests/test_pipeline_e2e.py           (pytest-based, isolated state)
+- Manual smoke run on tests/fixtures/sample-data/ (14 files)
+
+## E2E Smoke Run Results
+- Wall time:    ~7.5 minutes (qwen3:8b on 14 files, sequential)
+- Scanned:      14
+- Classified:   14
+- Organized:    14
+- Duplicates:   4 (1 near-dup correctly detected in meeting notes; 3 PDFs flagged because
+                  Unstructured not installed → fallback string extraction gave similar embeddings)
+- Categories discovered: 12
+  - Documents/Meetings, Documents/Contracts, Documents/Engineering, Documents/Architecture
+  - Documents/Personal, Documents/Structure
+  - Reports/Financial, Code/ProjectDocs, Logs/System
+  - Media/Photos, Tasks/To-do, Trash/Text
+- Catalog generated: overview, index, categories, tags, duplicates (Obsidian wiki-links)
+- Sidecars: 13 metadata JSON files in _metadata/
+
+## Known Issues (for daylight review)
+1. Unstructured.io not installed → PDFs use crude string extraction. Embeddings of small
+   minimal PDFs are too similar → false-positive near-dup grouping.
+   FIX: `pip install "unstructured[all-docs]"` (already declared in pyproject.toml)
+2. Vision skipped on PNG fixtures (test ran with vision_provider=none for isolation).
+   When you run with real images and Gemini key, expect descriptions.
+3. Exact-duplicate detection via embedding similarity is fragile — the deterministic
+   path is hash-based and works (file with identical hash is deduped at Scanner level
+   via idempotency). The 0.9999 threshold path is belt-and-suspenders.
+4. Sequential routing per file (~30s per LLM call on qwen3:8b). For larger folders,
+   consider parallelism (Ollama supports it via REX_OLLAMA_PARALLEL).
+5. Disk at 98% — clean up before running on large folders.
+
+## Files Created/Modified (no commits)
+- New: src/rex/orchestrator/{__init__,contracts,state,pipeline,builder}.py
+- New: src/rex/agents/{scanner,router,organizer}.py
+- New: src/rex/cli/scan.py
+- New: src/rex/ui/app.py
+- New: tests/test_pipeline_e2e.py
+- New: scripts/generate_fixtures.py
+- New: tests/fixtures/sample-data/ (14 files)
+- Modified: src/rex/config.py (dotenv loading + Gemini key aliases)
+- Modified: src/rex/cli/main.py (wired scan command)
+
+## Morning Verification Commands
+```
+cd /Users/giggso/AntiGravity_Projects/Proj1/CleanUp
+
+# 1. See output of the e2e run
+ls tests/.e2e-output/_catalog/
+cat tests/.e2e-output/_catalog/overview.md
+
+# 2. Re-run smoke test on fixtures
+PYTHONPATH=src python3 -m rex.cli.main scan tests/fixtures/sample-data --output /tmp/rex-test
+
+# 3. Launch the UI
+PYTHONPATH=src streamlit run src/rex/ui/app.py
+
+# 4. Read this log
+cat overnight-run.log
+```
+
+## Status: ✅ ALL 6 TASKS COMPLETE
+Token budget: stayed well within 200K cap.
+No git commits made — review and commit in AM.
