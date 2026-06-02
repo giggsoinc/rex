@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: rex-postgres
+    environment:
+      POSTGRES_USER: rex
+      POSTGRES_PASSWORD: rex
+      POSTGRES_DB: rex
+    ports:
+      - "5432:5432"
+    volumes:
+      - rex_pgdata:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rex"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: rex-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - rex_ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+
+  rex-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rex-app
+    ports:
+      - "8501:8501"
+    environment:
+      REX_LLM_PROVIDER: ollama
+      REX_LLM_ENDPOINT: http://ollama:11434
+      REX_LLM_MODEL: dolphin-mistral:latest
+      REX_EMBED_MODEL: all-minilm:latest
+      REX_VISION_PROVIDER: gemini
+      REX_DB_URL: postgresql+asyncpg://rex:rex@postgres:5432/rex
+      REX_STORAGE_BACKEND: local
+      REX_STORAGE_PATH: /app/output
+    volumes:
+      - ./output:/app/output
+      - ./src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+
+volumes:
+  rex_pgdata:
+  rex_ollama:

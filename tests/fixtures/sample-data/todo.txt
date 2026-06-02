@@ -1,0 +1,4 @@
+1. Finish Rex MVP
+2. Test pipeline
+3. Document everything
+4. Demo to team

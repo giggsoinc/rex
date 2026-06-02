@@ -1,0 +1,3 @@
+[INFO] 2023-01-01 line 1
+[ERROR] line 2
+[INFO] line 3
