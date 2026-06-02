@@ -6,38 +6,17 @@ or any orchestrator later — agents are pluggable via contracts.py protocols.
 
 from __future__ import annotations
 
-import asyncio
-import time
-from dataclasses import dataclass, field
-from typing import Awaitable, Callable
-
 import structlog
 
 from rex.config import Settings, get_settings
 from rex.models.schemas import JobStatus, ScanJob
 from rex.orchestrator.contracts import OrganizerAgent, RouterAgent, ScannerAgent
+from rex.orchestrator.pipeline_progress import PipelineProgress, ProgressCallback
+from rex.orchestrator.pipeline_stages import run_organize_stage, run_route_stage
 from rex.orchestrator.state import JobStore
 from rex.vectorstore import VectorStore
 
 logger = structlog.get_logger()
-
-ProgressCallback = Callable[["PipelineProgress"], Awaitable[None]]
-
-
-@dataclass
-class PipelineProgress:
-    """Snapshot of pipeline state for UI/CLI consumption."""
-
-    job_id: str
-    status: JobStatus
-    total: int = 0
-    scanned: int = 0
-    routed: int = 0
-    organized: int = 0
-    duplicates: int = 0
-    categories: list[str] = field(default_factory=list)
-    current_file: str = ""
-    error: str = ""
 
 
 class RexPipeline:
@@ -88,7 +67,6 @@ class RexPipeline:
         progress = PipelineProgress(job_id=job.id, status=JobStatus.SCANNING)
 
         try:
-            # Estimate work
             progress.total = await self.scanner.estimate_count(source_path)
             await self._emit(progress)
             job.total_files = progress.total
@@ -108,37 +86,16 @@ class RexPipeline:
             await self.job_store.update_job(job)
 
             # Stage 2: Route (LLM classify + dedup)
-            decisions = {}
             categories_seen: set[str] = set()
-            for ctx in contexts:
-                # Idempotency: skip if decision already exists
-                existing = await self.job_store.get_decision(job.id, ctx.file_record.id)
-                if existing is not None:
-                    decisions[ctx.file_record.id] = existing
-                    progress.routed += 1
-                    categories_seen.add(existing.category)
-                    if existing.duplicate_of:
-                        progress.duplicates += 1
-                    continue
-
-                try:
-                    decision = await self.router.route(ctx)
-                except Exception as e:
-                    logger.error("router_failed_for_file", file=ctx.file_record.filename, error=str(e))
-                    progress.error = f"Router failed on {ctx.file_record.filename}: {e}"
-                    continue
-
-                await self.job_store.save_decision(ctx.file_record.id, job.id, decision)
-                decisions[ctx.file_record.id] = decision
-                progress.routed += 1
-                progress.current_file = ctx.file_record.filename
-                categories_seen.add(decision.category)
-                if decision.duplicate_of:
-                    progress.duplicates += 1
-                await self._emit(progress)
-
-                # Small breath between calls to keep Ollama happy
-                await asyncio.sleep(0.05)
+            decisions = await run_route_stage(
+                router=self.router,
+                job_store=self.job_store,
+                job_id=job.id,
+                contexts=contexts,
+                progress=progress,
+                categories_seen=categories_seen,
+                emit=self._emit,
+            )
 
             job.classified_files = progress.routed
             job.duplicate_count = progress.duplicates
@@ -148,21 +105,14 @@ class RexPipeline:
             progress.categories = job.categories_discovered
 
             # Stage 3: Organize (move/copy + sidecars)
-            for ctx in contexts:
-                decision = decisions.get(ctx.file_record.id)
-                if decision is None:
-                    continue
-                try:
-                    new_path = await self.organizer.organize(
-                        ctx.file_record, decision, output_path
-                    )
-                    progress.organized += 1
-                    progress.current_file = ctx.file_record.filename
-                except Exception as e:
-                    logger.error("organize_failed", file=ctx.file_record.filename, error=str(e))
-                    progress.error = f"Organize failed on {ctx.file_record.filename}: {e}"
-                    continue
-                await self._emit(progress)
+            await run_organize_stage(
+                organizer=self.organizer,
+                contexts=contexts,
+                decisions=decisions,
+                output_path=output_path,
+                progress=progress,
+                emit=self._emit,
+            )
 
             # Finalize: build catalog
             await self.organizer.finalize(job.id, output_path)

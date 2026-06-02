@@ -2,59 +2,31 @@
 
 from __future__ import annotations
 
-from enum import Enum
-from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
+from rex.config_enums import (
+    DeploymentMode,
+    LLMProvider,
+    RexProfile,
+    StorageBackend,
+    VectorStoreType,
+    VisionProvider,
+)
+from rex.config_env import find_env_files
 
-class LLMProvider(str, Enum):
-    """Supported LLM providers."""
-
-    OLLAMA = "ollama"
-    GEMINI = "gemini"
-    BEDROCK = "bedrock"
-    OPENAI = "openai"
-
-
-class VisionProvider(str, Enum):
-    """Supported vision providers."""
-
-    GEMINI = "gemini"
-    OPENAI = "openai"
-    NONE = "none"
-
-
-class StorageBackend(str, Enum):
-    """Output storage backend options."""
-
-    LOCAL = "local"
-    S3 = "s3"
-
-
-class DeploymentMode(str, Enum):
-    """Deployment mode chosen during onboarding."""
-
-    LOCAL = "local"
-    ENTERPRISE = "enterprise"
-
-
-class VectorStoreType(str, Enum):
-    """Vector store backends."""
-
-    LANCEDB = "lancedb"
-    PGVECTOR = "pgvector"
-    ORACLE26AI = "oracle26ai"
-    CHROMADB = "chromadb"
-
-
-class RexProfile(str, Enum):
-    """Resource profile for model selection."""
-
-    FULL = "full"       # qwen3:8b
-    LIGHT = "light"     # gemma3:4b — fits on 16GB laptops
+__all__ = [
+    "LLMProvider",
+    "VisionProvider",
+    "StorageBackend",
+    "DeploymentMode",
+    "VectorStoreType",
+    "RexProfile",
+    "Settings",
+    "get_settings",
+]
 
 
 class Settings(BaseSettings):
@@ -122,54 +94,6 @@ class Settings(BaseSettings):
     model_config = {"env_prefix": "REX_", "env_file": ".env.local", "extra": "ignore"}
 
 
-def _find_env_files() -> list[str]:
-    """Locate .env / .env.local regardless of the current working directory.
-
-    Rex is often launched from a folder other than its repo (e.g. via a
-    pip-installed `rex` command). Relative dotenv paths break in that case,
-    so we search a deterministic chain and return every file found.
-
-    Search order (lowest priority first; with override=False the FIRST load
-    of a given key wins, so we load highest-priority files LAST is wrong —
-    instead we order the list highest-priority FIRST and load with
-    override=False so earlier entries win):
-      1. $REX_ENV_FILE (explicit override)
-      2. Current working directory
-      3. Repo root (walk up from this module looking for pyproject.toml/.env.local)
-      4. ~/.rex/  (user-global config)
-    """
-    import os
-
-    found: list[str] = []
-
-    # 1. Explicit override
-    explicit = os.environ.get("REX_ENV_FILE")
-    if explicit and Path(explicit).expanduser().exists():
-        found.append(str(Path(explicit).expanduser()))
-
-    # Candidate directories, in priority order
-    dirs: list[Path] = [Path.cwd()]
-
-    # Repo root — walk up from this file
-    here = Path(__file__).resolve()
-    for parent in here.parents:
-        if (parent / "pyproject.toml").exists() or (parent / ".env.local").exists():
-            dirs.append(parent)
-            break
-
-    # User-global config dir
-    dirs.append(Path.home() / ".rex")
-
-    # Collect .env.local then .env in each dir (REX_* config wins over project .env)
-    for d in dirs:
-        for name in (".env.local", ".env"):
-            p = d / name
-            if p.exists() and str(p) not in found:
-                found.append(str(p))
-
-    return found
-
-
 def get_settings() -> Settings:
     """Get validated Rex settings from environment.
 
@@ -180,7 +104,7 @@ def get_settings() -> Settings:
     from dotenv import load_dotenv
 
     # Load every discovered env file. override=False → first (highest-priority) wins.
-    for env_file in _find_env_files():
+    for env_file in find_env_files():
         load_dotenv(env_file, override=False)
 
     s = Settings()

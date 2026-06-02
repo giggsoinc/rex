@@ -15,11 +15,12 @@ import ollama
 import structlog
 
 from rex.config import LLMProvider, Settings, get_settings
+from rex.ml.provider_backends import BedrockBackendMixin
 
 logger = structlog.get_logger()
 
 
-class ModelProvider:
+class ModelProvider(BedrockBackendMixin):
     """Unified interface to LLM and embedding models."""
 
     def __init__(self, settings: Settings | None = None) -> None:
@@ -111,18 +112,6 @@ class ModelProvider:
             input=text,
         )
         return response["embeddings"][0]
-
-    # --- Bedrock backend (stub — Phase cloud) ---
-
-    async def _bedrock_generate(self, prompt: str, system: str, json_mode: bool) -> str:
-        """Generate via AWS Bedrock. Stub for cloud deployment."""
-        raise NotImplementedError("Bedrock provider not yet implemented. Set REX_LLM_PROVIDER=ollama for local use.")
-
-    async def _bedrock_embed(self, text: str) -> list[float]:
-        """Embed via AWS Bedrock Titan. Stub for cloud deployment."""
-        raise NotImplementedError("Bedrock embedding not yet implemented. Set REX_LLM_PROVIDER=ollama for local use.")
-
-    # --- Health check ---
 
     async def health_check(self) -> dict[str, bool]:
         """Check if model provider is reachable and models are available."""

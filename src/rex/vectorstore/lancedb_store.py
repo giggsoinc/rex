@@ -13,6 +13,12 @@ from typing import Any
 import structlog
 
 from rex.vectorstore.base import VectorMatch, VectorStore
+from rex.vectorstore.lancedb_helpers import (
+    build_schema,
+    merge_rows,
+    rows_to_matches,
+    run_search,
+)
 
 logger = structlog.get_logger()
 
@@ -49,20 +55,9 @@ class LanceDBStore(VectorStore):
             self._table = await asyncio.to_thread(self._db.open_table, self.table_name)
             logger.info("lancedb_table_opened", path=str(self.db_path), table=self.table_name)
         else:
-            schema = self._build_schema()
+            schema = build_schema(self.dim)
             self._table = await asyncio.to_thread(self._db.create_table, self.table_name, schema=schema)
             logger.info("lancedb_table_created", path=str(self.db_path), table=self.table_name, dim=self.dim)
-
-    def _build_schema(self):
-        """Build PyArrow schema for the vectors table."""
-        import pyarrow as pa
-        return pa.schema(
-            [
-                pa.field("file_id", pa.string()),
-                pa.field("vector", pa.list_(pa.float32(), self.dim)),
-                pa.field("metadata_json", pa.string()),
-            ]
-        )
 
     async def upsert(self, file_id: str, embedding: list[float], metadata: dict) -> None:
         """Upsert one vector. LanceDB doesn't have native upsert — delete then add."""
@@ -96,27 +91,8 @@ class LanceDBStore(VectorStore):
         if self._table is None:
             await self.initialize()
 
-        def _do_search():
-            query = self._table.search(query_vector).metric("cosine").limit(top_k)
-            if filters:
-                # LanceDB SQL-like filter
-                filter_clauses = []
-                for key, value in filters.items():
-                    if isinstance(value, str):
-                        filter_clauses.append(f"metadata_json LIKE '%\"{key}\":\"{value}\"%'")
-                if filter_clauses:
-                    query = query.where(" AND ".join(filter_clauses))
-            return query.to_list()
-
-        results = await asyncio.to_thread(_do_search)
-        return [
-            VectorMatch(
-                file_id=r["file_id"],
-                similarity_score=1.0 - float(r.get("_distance", 0)),  # cosine distance → similarity
-                metadata=json.loads(r.get("metadata_json", "{}")),
-            )
-            for r in results
-        ]
+        results = await asyncio.to_thread(run_search, self._table, query_vector, top_k, filters)
+        return rows_to_matches(results)
 
     async def delete(self, file_id: str) -> None:
         """Delete a vector by file_id."""
@@ -149,36 +125,10 @@ class LanceDBStore(VectorStore):
         """Merge another LanceDB's vectors into this one. Returns rows merged.
 
         Used by Janitor after parallel workers finish to consolidate shards.
-        Uses to_arrow() (lighter dep than to_pandas() which requires pylance).
         """
-        import lancedb
-
         if self._table is None:
             await self.initialize()
 
-        def _do_merge():
-            try:
-                other_db = lancedb.connect(other_path)
-                other_table = other_db.open_table(self.table_name)
-                # Try multiple APIs — lancedb versions differ
-                rows = []
-                try:
-                    # Modern: to_arrow then to_pylist
-                    arrow_table = other_table.to_arrow()
-                    rows = arrow_table.to_pylist()
-                except Exception:
-                    try:
-                        rows = other_table.to_list()
-                    except Exception:
-                        # Last resort: search all (limit very high)
-                        rows = other_table.search().limit(10**7).to_list()
-                if rows:
-                    self._table.add(rows)
-                return len(rows)
-            except Exception as e:
-                logger.error("lancedb_merge_failed", from_path=other_path, error=str(e)[:200])
-                return 0
-
-        merged = await asyncio.to_thread(_do_merge)
+        merged = await asyncio.to_thread(merge_rows, self._table, self.table_name, other_path)
         logger.info("lancedb_merged", from_path=other_path, rows=merged)
         return merged

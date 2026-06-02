@@ -15,6 +15,7 @@ Run: pytest tests/test_pipeline_e2e.py -v -s
 from __future__ import annotations
 
 import asyncio
+import logging
 import shutil
 from pathlib import Path
 
@@ -107,13 +108,11 @@ async def test_full_pipeline_runs_on_fixtures():
     sidecars = list(metadata.glob("*.json"))
     assert len(sidecars) >= 1, "no sidecars written"
 
-    # Print summary for human review
-    print(f"\n=== E2E SUMMARY ===")
-    print(f"Job ID:      {job.id}")
-    print(f"Status:      {job.status.value}")
-    print(f"Scanned:     {job.scanned_files}")
-    print(f"Classified:  {job.classified_files}")
-    print(f"Organized:   {job.organized_files}")
-    print(f"Duplicates:  {job.duplicate_count}")
-    print(f"Categories:  {job.categories_discovered}")
-    print(f"Output:      {OUTPUT}")
+    # Log summary for human review (pytest -s --log-cli-level=INFO to view)
+    logger = logging.getLogger("rex.e2e")
+    logger.info(
+        "E2E SUMMARY job=%s status=%s scanned=%s classified=%s organized=%s "
+        "duplicates=%s categories=%s output=%s",
+        job.id, job.status.value, job.scanned_files, job.classified_files,
+        job.organized_files, job.duplicate_count, job.categories_discovered, OUTPUT,
+    )
