@@ -19,62 +19,50 @@ logger = structlog.get_logger()
 
 # --- Text extraction ---
 
+# Per-format dispatch — each entry is a sync extractor(path, max_chars) -> str.
+_EXTRACTORS: dict[str, str] = {
+    ".pdf": "extract_pdf",
+    ".docx": "extract_docx",
+    ".pptx": "extract_pptx",
+    ".xlsx": "extract_xlsx",
+    ".doc": "extract_legacy",
+    ".ppt": "extract_legacy",
+    ".xls": "extract_legacy",
+}
+
+
 async def extract_text(path: Path, media_type: MediaType, max_chars: int) -> str:
     """Extract textual content from a file. Returns first max_chars only.
 
-    Uses Unstructured.io for binary docs (PDF, DOCX, PPTX).
-    Plain text files: direct read.
-    Images/video: empty (vision handled separately).
+    Routes each format to a dedicated pure-Python extractor (no LibreOffice):
+      pdf->pdfplumber/pypdf, docx->python-docx, pptx->python-pptx, xlsx->openpyxl.
+    Legacy .doc/.ppt/.xls degrade to "" (classified by filename/metadata).
+    Plain text: direct read. Images/video/audio/archive/binary: "".
+    Never raises — one bad file must not kill the batch.
     """
-    try:
-        if media_type == MediaType.TEXT:
-            ext = path.suffix.lower()
-            if ext in {".pdf", ".docx", ".pptx", ".xlsx", ".doc", ".ppt", ".xls"}:
-                return await _unstructured_extract(path, max_chars)
-            # Plain text/markdown/json/etc.
-            def _read():
-                try:
-                    return path.read_text(encoding="utf-8", errors="ignore")
-                except Exception:
-                    return ""
-            text = await asyncio.to_thread(_read)
-            return text[:max_chars]
-
-        if media_type in {MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.ARCHIVE, MediaType.BINARY}:
-            return ""
-
-    except Exception as e:
-        logger.warning("text_extraction_failed", path=str(path), error=str(e))
+    if media_type != MediaType.TEXT:
         return ""
 
-    return ""
+    ext = path.suffix.lower()
+    fn_name = _EXTRACTORS.get(ext)
+    try:
+        if fn_name is not None:
+            from rex.agents import scanner_extractors as ex
+            fn = getattr(ex, fn_name)
+            text = await asyncio.to_thread(fn, path, max_chars)
+            return text[:max_chars] if text else ""
 
-
-async def _unstructured_extract(path: Path, max_chars: int) -> str:
-    """Use Unstructured.io for binary docs. Falls back gracefully if missing."""
-    def _do_extract():
-        try:
-            from unstructured.partition.auto import partition
-            elements = partition(filename=str(path))
-            text = "\n".join(str(el) for el in elements)
-            return text
-        except ImportError:
-            logger.warning("unstructured_not_installed", path=str(path))
-            # Last-resort: try to grep readable strings from bytes for PDFs
+        # Plain text/markdown/json/csv/etc.
+        def _read() -> str:
             try:
-                raw = path.read_bytes()
-                # Crude: extract printable ASCII runs of length >= 4
-                import re
-                strings = re.findall(rb"[\x20-\x7e]{4,}", raw)
-                return b"\n".join(strings[:200]).decode("ascii", errors="ignore")
+                return path.read_text(encoding="utf-8", errors="ignore")
             except Exception:
                 return ""
-        except Exception as e:
-            logger.warning("unstructured_extract_failed", path=str(path), error=str(e))
-            return ""
-
-    text = await asyncio.to_thread(_do_extract)
-    return text[:max_chars] if text else ""
+        text = await asyncio.to_thread(_read)
+        return text[:max_chars]
+    except Exception as e:
+        logger.warning("text_extraction_failed", path=str(path), error=str(e)[:120])
+        return ""
 
 
 # --- Hash + metadata ---
