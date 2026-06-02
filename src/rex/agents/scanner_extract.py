@@ -54,6 +54,7 @@ async def extract_text(path: Path, media_type: MediaType, max_chars: int) -> str
 
         # Plain text/markdown/json/csv/etc.
         def _read() -> str:
+            """Read the file as UTF-8 text, ignoring decode errors."""
             try:
                 return path.read_text(encoding="utf-8", errors="ignore")
             except Exception:
@@ -70,6 +71,7 @@ async def extract_text(path: Path, media_type: MediaType, max_chars: int) -> str
 async def sha256_of_file(path: Path) -> str:
     """Compute SHA-256 in 64KB chunks. Off-thread to avoid blocking."""
     def _hash():
+        """Stream the file through SHA-256 in 64KB chunks."""
         h = hashlib.sha256()
         with open(path, "rb") as f:
             while True:

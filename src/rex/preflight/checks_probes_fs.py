@@ -98,10 +98,12 @@ async def check_source(source_path: str) -> CheckResult:
 
 
 async def _noop_check(name: str, msg: str) -> CheckResult:
+    """Return an always-OK check result (placeholder for skipped probes)."""
     return CheckResult(name, CheckStatus.OK, msg)
 
 
 def _human_size(b: int) -> str:
+    """Format a byte count as a human-readable size string."""
     if b < 1024:
         return f"{b} B"
     for unit, div in [("KB", 1024), ("MB", 1024**2), ("GB", 1024**3), ("TB", 1024**4)]:
