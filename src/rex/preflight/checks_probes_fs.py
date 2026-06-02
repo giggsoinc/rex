@@ -51,34 +51,35 @@ async def check_lancedb_writable(vector_path: str) -> CheckResult:
 
 
 def check_deps() -> CheckResult:
-    """Check optional Python dependencies for richer extraction."""
+    """Check per-format extractor libs. Each missing lib degrades one format."""
+    # module name -> the file types it unlocks
+    probes = {
+        "pdfplumber": "pdf",
+        "pypdf": "pdf-fallback",
+        "docx": "docx",
+        "pptx": "pptx",
+        "openpyxl": "xlsx",
+        "magic": "mime-detect",
+    }
     missing = []
     have = []
-    try:
-        import unstructured  # noqa: F401
-        have.append("unstructured")
-    except ImportError:
-        missing.append("unstructured")
-    try:
-        import pdfplumber  # noqa: F401
-        have.append("pdfplumber")
-    except ImportError:
-        missing.append("pdfplumber")
-    try:
-        import magic  # noqa: F401
-        have.append("python-magic")
-    except ImportError:
-        missing.append("python-magic")
+    for mod, fmt in probes.items():
+        try:
+            __import__(mod)
+            have.append(fmt)
+        except ImportError:
+            missing.append(f"{mod} ({fmt})")
 
-    if not have:
-        return CheckResult("Extractors", CheckStatus.SOFT_WARN,
-                           "No extraction libs installed — quality will degrade",
-                           {"missing": missing, "fix": "pip install unstructured pdfplumber python-magic"})
-    if missing:
-        return CheckResult("Extractors", CheckStatus.SOFT_WARN,
-                           f"Have: {', '.join(have)} | Missing: {', '.join(missing)}",
-                           {"missing": missing})
-    return CheckResult("Extractors", CheckStatus.OK, f"All available: {', '.join(have)}")
+    # Only PDF + Office libs are quality-critical; magic is cosmetic.
+    critical_missing = [m for m in missing if "mime-detect" not in m]
+    if not critical_missing:
+        extra = " (mime-detect via extension fallback)" if missing else ""
+        return CheckResult("Extractors", CheckStatus.OK,
+                           f"All extractors ready: {', '.join(have)}{extra}")
+    return CheckResult("Extractors", CheckStatus.SOFT_WARN,
+                       f"Missing: {', '.join(critical_missing)} — those formats degrade to filename",
+                       {"missing": critical_missing,
+                        "fix": "pip install pdfplumber pypdf python-docx python-pptx openpyxl"})
 
 
 async def check_source(source_path: str) -> CheckResult:
@@ -97,10 +98,12 @@ async def check_source(source_path: str) -> CheckResult:
 
 
 async def _noop_check(name: str, msg: str) -> CheckResult:
+    """Return an always-OK check result (placeholder for skipped probes)."""
     return CheckResult(name, CheckStatus.OK, msg)
 
 
 def _human_size(b: int) -> str:
+    """Format a byte count as a human-readable size string."""
     if b < 1024:
         return f"{b} B"
     for unit, div in [("KB", 1024), ("MB", 1024**2), ("GB", 1024**3), ("TB", 1024**4)]:
