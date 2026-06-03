@@ -45,7 +45,7 @@ class Settings(BaseSettings):
 
     # Vision
     vision_provider: VisionProvider = VisionProvider.GEMINI
-    vision_model: str = "gemini-2.0-flash"
+    vision_model: str = "gemini-2.0-flash-lite"
     gemini_api_key: str = ""
 
     # Vector store

@@ -10,7 +10,7 @@ AVG_TOKENS_PER_FILE_OUT = 150     # FileDecision JSON
 # Rough per-million-token costs (cloud LLMs)
 COST_PER_MTOK_IN: dict[str, float] = {
     "ollama": 0.0,
-    "gemini-2.0-flash": 0.10,
+    "gemini-2.0-flash-lite": 0.10,
     "gemini-3.1-flash-lite": 0.10,
     "gemini-3.5-flash": 0.30,
     "claude-haiku-4-5-20251001": 1.00,
@@ -19,7 +19,7 @@ COST_PER_MTOK_IN: dict[str, float] = {
 }
 COST_PER_MTOK_OUT: dict[str, float] = {
     "ollama": 0.0,
-    "gemini-2.0-flash": 0.40,
+    "gemini-2.0-flash-lite": 0.40,
     "gemini-3.1-flash-lite": 0.40,
     "gemini-3.5-flash": 2.50,
     "claude-haiku-4-5-20251001": 5.00,

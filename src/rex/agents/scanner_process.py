@@ -94,7 +94,7 @@ class ScannerProcessMixin:
         # IMPORTANT: truncate aggressively — all-minilm has a 256-token context window
         from rex.utils.skip_rules import truncate_for_embedding
         embed_input_raw = text or image_desc or path.stem.replace("_", " ").replace("-", " ")
-        embed_input = truncate_for_embedding(embed_input_raw, max_chars=1000)
+        embed_input = truncate_for_embedding(embed_input_raw, max_chars=500)
         embedding: list[float] = []
         if embed_input.strip():
             try:
