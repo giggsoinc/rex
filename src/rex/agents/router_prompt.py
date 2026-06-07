@@ -21,12 +21,16 @@ You MUST return ONLY valid JSON matching this exact schema:
   "category": "string — folder path like 'Documents/Finance' or 'Presentations/Q3'",
   "tags": ["array", "of", "descriptive", "tags"],
   "relevance": 1-5 integer,
+  "confidence": 0.0-1.0 float (REQUIRED — how sure are you?),
   "action": "keep" | "archive" | "trash",
   "reasoning": "one sentence explanation"
 }
 
 Rules:
 - relevance: 5 = critical, 4 = important, 3 = useful, 2 = marginal, 1 = junk
+- confidence: be honest. 0.9+ only when filename and content strongly agree;
+  0.5-0.7 when you had to guess between two domains; <0.5 when truly uncertain.
+  Low confidence triggers human review — do not inflate to avoid review.
 - action=trash only when relevance is 1 (clearly junk/temp/noise)
 - action=archive for old or rarely-needed content (relevance 2-3)
 - action=keep for current/useful content (relevance 3-5)
