@@ -9,6 +9,8 @@ import streamlit as st
 
 from rex.ui.pages_browse import page_browse
 from rex.ui.pages_misc import page_jobs, page_search, page_settings
+from rex.ui.pages_onboard import page_onboard
+from rex.ui.pages_review import page_review
 from rex.ui.pages_scan import page_scan
 from rex.ui.state import get_store
 
@@ -21,7 +23,9 @@ st.set_page_config(
 
 
 PAGES = {
+    "🚀 Onboard": page_onboard,
     "📁 Scan": page_scan,
+    "📥 Review": page_review,
     "📊 Jobs": page_jobs,
     "🗂️ Browse": page_browse,
     "🔎 Search": page_search,
