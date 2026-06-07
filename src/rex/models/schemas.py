@@ -47,9 +47,14 @@ class JobStatus(str, Enum):
     SCANNING = "scanning"
     ROUTING = "routing"
     ORGANIZING = "organizing"
+    AWAITING_REVIEW = "awaiting_review"  # HITL gate — user must triage before SERVE
     COMPLETE = "complete"
     FAILED = "failed"
     PAUSED = "paused"
+
+
+# BusinessContext + ModelProfile live in business_context.py (line-budget split).
+from rex.models.business_context import BusinessContext, ModelProfile  # noqa: E402,F401
 
 
 # --- Scanner Output ---
@@ -111,9 +116,10 @@ class FileDecision(BaseModel):
     action: FileAction = Field(description="What to do: keep, archive, or trash")
     reasoning: str = Field(description="One sentence explaining the decision")
 
-    # Phase II graph readiness
+    # Confidence (0-1) — <threshold routes to _Review/. Phase II graph fields below.
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0, description="Classification confidence")
     entity_type: str = Field(default="File", description="Knowledge graph node type")
-    relation_hints: Optional[dict] = Field(default=None, description="Discovered relationships for graph edges")
+    relation_hints: Optional[dict] = Field(default=None, description="Relationships for graph edges")
 
 
 # --- Job ---
