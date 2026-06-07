@@ -142,8 +142,9 @@ class ScanJob(BaseModel):
     enhance_in_place: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
+    last_progress_at: Optional[datetime] = None  # heartbeat — touched per file
+    current_file: Optional[str] = None           # name currently being processed
     error: Optional[str] = None
 
 
-# Fix forward reference
 FileContext.model_rebuild()

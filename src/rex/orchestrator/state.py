@@ -69,9 +69,32 @@ class JobStore(RecordsMixin):
         return job
 
     async def update_job(self, job: ScanJob) -> None:
-        """Persist job state."""
+        """Persist job state. Touches last_progress_at unless already terminal."""
+        from datetime import datetime
+        from rex.models.schemas import JobStatus
+        if job.status not in (JobStatus.COMPLETE, JobStatus.FAILED):
+            job.last_progress_at = datetime.utcnow()
         meta_file = self._job_dir(job.id) / "job.json"
         meta_file.write_text(job.model_dump_json(indent=2))
+
+    async def touch_progress(
+        self, job_id: str, current_file: str | None = None,
+        scanned: int | None = None, classified: int | None = None,
+        organized: int | None = None,
+    ) -> None:
+        """Lightweight heartbeat — load job, bump counters + last_progress_at."""
+        job = await self.get_job(job_id)
+        if job is None:
+            return
+        if current_file is not None:
+            job.current_file = current_file
+        if scanned is not None:
+            job.scanned_files = scanned
+        if classified is not None:
+            job.classified_files = classified
+        if organized is not None:
+            job.organized_files = organized
+        await self.update_job(job)
 
     async def get_job(self, job_id: str) -> ScanJob | None:
         """Load a job by ID."""
