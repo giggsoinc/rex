@@ -71,23 +71,4 @@ def page_search() -> None:
                 st.json(m.metadata)
 
 
-def page_settings() -> None:
-    """Settings — read-only display of current config."""
-    st.title("⚙️ Settings")
-    s = get_settings()
-    st.subheader("Active configuration")
-    st.json({
-        "deployment_mode": s.deployment_mode.value,
-        "llm_provider": s.llm_provider.value,
-        "llm_model": s.llm_model,
-        "embed_model": s.embed_model,
-        "vector_store": s.vector_store.value,
-        "vector_path": s.vector_path,
-        "vision_provider": s.vision_provider.value,
-        "vision_model": s.vision_model,
-        "secret_provider": s.secret_provider,
-        "storage_path": s.storage_path,
-        "dedup_near_threshold": s.dedup_near_threshold,
-        "dedup_related_threshold": s.dedup_related_threshold,
-    })
-    st.info("To change settings, edit `.env.local` or rerun `rex init`.")
+# page_settings moved to pages_settings.py — fully editable + masked secrets.

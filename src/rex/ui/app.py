@@ -8,10 +8,11 @@ from __future__ import annotations
 import streamlit as st
 
 from rex.ui.pages_browse import page_browse
-from rex.ui.pages_misc import page_jobs, page_search, page_settings
+from rex.ui.pages_misc import page_jobs, page_search
 from rex.ui.pages_onboard import page_onboard
 from rex.ui.pages_review import page_review
 from rex.ui.pages_scan import page_scan
+from rex.ui.pages_settings import page_settings
 from rex.ui.state import get_store
 
 st.set_page_config(
