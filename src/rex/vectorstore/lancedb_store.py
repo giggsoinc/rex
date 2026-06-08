@@ -19,6 +19,7 @@ from rex.vectorstore.lancedb_helpers import (
     rows_to_matches,
     run_search,
 )
+from rex.vectorstore.path_guard import validate_writable_path
 
 logger = structlog.get_logger()
 
@@ -37,7 +38,7 @@ class LanceDBStore(VectorStore):
             table_name: Name of the vector table.
             dim: Embedding dimension (default 384 for all-minilm).
         """
-        self.db_path = Path(db_path).expanduser().resolve()
+        self.db_path = validate_writable_path(db_path, field="REX_VECTOR_PATH")
         self.table_name = table_name
         self.dim = dim
         self._db: Any = None
