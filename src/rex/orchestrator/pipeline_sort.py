@@ -13,6 +13,7 @@ from typing import Any
 import structlog
 
 from rex.agents.sort_engine import SortEngine
+from rex.agents.version_detector import detect_versions
 from rex.models.business_context import BusinessContext
 from rex.orchestrator.pipeline_progress import PipelineProgress, ProgressCallback
 from rex.orchestrator.state import JobStore
@@ -39,7 +40,13 @@ async def run_sort_stage(
     Files needing review remain in _Review/ until HITL clears them.
     Persists per-file heartbeat when job_store + job_id are supplied.
     """
-    engine = SortEngine()
+    # Version supersession pass — mark older V<N> files for _Stale/ before placement
+    records = [ctx.file_record for ctx in contexts]
+    version_map = detect_versions(records)
+    if version_map:
+        logger.info("version_supersession_active", stale_count=len(version_map))
+
+    engine = SortEngine(version_map=version_map)
     placements: dict[str, Any] = {}
     out_root = Path(output_path).expanduser().resolve()
 

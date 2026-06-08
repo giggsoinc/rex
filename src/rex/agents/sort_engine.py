@@ -30,8 +30,9 @@ import structlog
 from rex.agents.sort_engine_index import write_index
 from rex.agents.sort_engine_routing import SortDecision, resolve_destination
 from rex.agents.sort_engine_taxonomy import extension_to_bucket, safe_segment
+from rex.agents.version_detector import SupersessionInfo
 from rex.models.business_context import BusinessContext
-from rex.models.schemas import FileDecision, FileRecord
+from rex.models.schemas import DedupStatus, FileDecision, FileRecord
 from rex.plugins.local_fs import LocalFSPlugin
 
 logger = structlog.get_logger()
@@ -52,9 +53,20 @@ class SortEngine:
     Idempotent: copy is skipped if destination already exists with same size.
     """
 
-    def __init__(self, fs: LocalFSPlugin | None = None) -> None:
-        """Construct the sort engine. Accepts an optional injected FS plugin."""
+    def __init__(
+        self,
+        fs: LocalFSPlugin | None = None,
+        version_map: dict[str, SupersessionInfo] | None = None,
+    ) -> None:
+        """Construct the sort engine.
+
+        Args:
+            fs: optional injected FS plugin.
+            version_map: optional {file_id: SupersessionInfo} from version_detector;
+                files in the map are routed to _Stale/ regardless of router decision.
+        """
         self.fs = fs or LocalFSPlugin()
+        self.version_map = version_map or {}
         # Track placements for INDEX.md
         self._placements: list[tuple[FileRecord, FileDecision, SortDecision]] = []
 
@@ -67,6 +79,17 @@ class SortEngine:
     ) -> SortDecision:
         """Resolve destination and copy the file. Returns the SortDecision."""
         out_root = Path(output_root).expanduser().resolve()
+        # Apply version supersession overlay BEFORE routing
+        if file_record.id in self.version_map:
+            info = self.version_map[file_record.id]
+            decision = decision.model_copy(update={
+                "dedup_status": DedupStatus.SUPERSEDED,
+                "duplicate_of": info.superseded_by,
+                "reasoning": (
+                    f"Superseded by V{info.canonical_version} "
+                    f"(this is V{info.own_version}); " + decision.reasoning
+                ),
+            })
         sort = resolve_destination(file_record, decision, context, out_root)
 
         sort.destination.parent.mkdir(parents=True, exist_ok=True)

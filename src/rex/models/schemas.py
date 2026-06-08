@@ -38,6 +38,7 @@ class DedupStatus(str, Enum):
     EXACT_DUPLICATE = "exact_duplicate"
     NEAR_DUPLICATE = "near_duplicate"
     RELATED = "related"
+    SUPERSEDED = "superseded"  # older V<N>; latest V<N> in same stem-group wins
 
 
 class JobStatus(str, Enum):
@@ -145,6 +146,5 @@ class ScanJob(BaseModel):
     last_progress_at: Optional[datetime] = None  # heartbeat — touched per file
     current_file: Optional[str] = None           # name currently being processed
     error: Optional[str] = None
-
 
 FileContext.model_rebuild()

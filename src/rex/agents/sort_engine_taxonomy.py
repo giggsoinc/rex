@@ -14,6 +14,7 @@ __all__ = [
     "UNSORTED_DIR",
     "TRASH_DIR",
     "ARCHIVE_DIR",
+    "STALE_DIR",
     "extension_to_bucket",
     "safe_segment",
 ]
@@ -55,6 +56,7 @@ REVIEW_DIR = "_Review"
 UNSORTED_DIR = "_Unsorted"
 TRASH_DIR = "_Trash"
 ARCHIVE_DIR = "_Archive"
+STALE_DIR = "_Stale"  # older versions superseded by a higher V<N> in the same group
 
 _SAFE_PATH_RE = re.compile(r"[^a-zA-Z0-9._\-]")
 

@@ -11,13 +11,14 @@ from pathlib import Path
 from rex.agents.sort_engine_taxonomy import (
     ARCHIVE_DIR,
     REVIEW_DIR,
+    STALE_DIR,
     TRASH_DIR,
     UNSORTED_DIR,
     extension_to_bucket,
     safe_segment,
 )
 from rex.models.business_context import BusinessContext
-from rex.models.schemas import FileAction, FileDecision, FileRecord
+from rex.models.schemas import DedupStatus, FileAction, FileDecision, FileRecord
 
 __all__ = ["SortDecision", "resolve_destination", "align_to_domain"]
 
@@ -78,13 +79,22 @@ def resolve_destination(
     """Decide where the file goes — pure function, no side effects.
 
     Routing priorities:
-      1. TRASH action → _Trash/{bucket}/
-      2. Confidence < threshold → _Review/
-      3. Category doesn't match any domain → _Unsorted/{bucket}/
-      4. ARCHIVE action → _Archive/{domain}/{bucket}/
-      5. Normal KEEP → {domain}/{bucket}/
+      1. SUPERSEDED (older V<N>) → _Stale/{bucket}/
+      2. TRASH action → _Trash/{bucket}/
+      3. Confidence < threshold → _Review/
+      4. Category doesn't match any domain → _Unsorted/{bucket}/
+      5. ARCHIVE action → _Archive/{domain}/{bucket}/
+      6. Normal KEEP → {domain}/{bucket}/
     """
     bucket = extension_to_bucket(file_record.extension)
+
+    if decision.dedup_status == DedupStatus.SUPERSEDED:
+        dest = output_root / STALE_DIR / bucket / file_record.filename
+        return SortDecision(
+            dest, bucket, None,
+            f"superseded by newer version (group: {decision.duplicate_of or 'unknown'})",
+            False,
+        )
 
     if decision.action == FileAction.TRASH:
         dest = output_root / TRASH_DIR / bucket / file_record.filename
