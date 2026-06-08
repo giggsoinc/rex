@@ -56,3 +56,6 @@ rex-data/
 # Local env with secrets — never commit
 .env.local
 .env.*.local
+
+# Session handshake — local snapshot, not committed
+HANDSHAKE.md

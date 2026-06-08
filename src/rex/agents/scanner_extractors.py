@@ -15,11 +15,17 @@ let the router classify by filename/metadata instead of crashing.
 from __future__ import annotations
 
 import shutil
+import logging
 from pathlib import Path
 
 import structlog
 
 logger = structlog.get_logger()
+
+# Suppress non-critical warnings from PDF libraries (malformed PDFs with invalid color values)
+logging.getLogger("pdfplumber").setLevel(logging.ERROR)
+logging.getLogger("pypdf").setLevel(logging.ERROR)
+logging.getLogger("pypdf.generic").setLevel(logging.ERROR)
 
 LEGACY_BINARY = {".doc", ".ppt", ".xls"}
 

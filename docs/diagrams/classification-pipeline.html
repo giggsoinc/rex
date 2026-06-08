@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Rex — Classification Pipeline (v1)</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a1f29;
+    --accent: #58a6ff;
+    --ok: #56d364;
+    --warn: #ffa657;
+    --bad: #f85149;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+    margin: 0;
+    padding: 32px 48px;
+    line-height: 1.5;
+  }
+  h1 {
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 12px;
+    margin-bottom: 8px;
+  }
+  .subtitle { color: var(--muted); margin-bottom: 32px; }
+  h2 { margin-top: 40px; color: var(--accent); }
+  h3 { color: var(--text); margin-top: 24px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin: 16px 0 32px;
+    overflow-x: auto;
+  }
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .legend-item {
+    background: var(--panel);
+    border-left: 4px solid var(--accent);
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .legend-item.ok { border-left-color: var(--ok); }
+  .legend-item.warn { border-left-color: var(--warn); }
+  .legend-item.bad { border-left-color: var(--bad); }
+  .legend-item b { color: var(--accent); }
+  .legend-item.ok b { color: var(--ok); }
+  .legend-item.warn b { color: var(--warn); }
+  .legend-item.bad b { color: var(--bad); }
+  code {
+    background: rgba(110, 118, 129, 0.2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--accent); }
+  .mermaid {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+  }
+  .pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 6px;
+  }
+  .pill.ok { background: var(--ok); }
+  .pill.warn { background: var(--warn); }
+  .pill.bad { background: var(--bad); }
+  footer {
+    margin-top: 64px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Rex — Classification Pipeline <span class="pill">v1</span></h1>
+<p class="subtitle">
+  End-to-end flow: file → embed → 3-way ensemble classification → routing →
+  HITL → continuous learning + drift detection.
+</p>
+
+<div class="legend">
+  <div class="legend-item ok"><b>● Built</b> SortEngine, BusinessContext, INDEX.md</div>
+  <div class="legend-item warn"><b>● To Build</b> Classifier module (kNN / BERTopic / LLM)</div>
+  <div class="legend-item bad"><b>● Gap Today</b> confidence not emitted by LLM router</div>
+  <div class="legend-item"><b>● Future</b> Active learning, ensemble weighting</div>
+</div>
+
+<h2>1 · End-to-end pipeline</h2>
+<div class="panel">
+<div class="mermaid">
+flowchart TD
+  Start([📄 File path]) --> FP[Fingerprint<br/>sha256 · mime · meta · text/vision extract]
+  FP -->|cache hit?| Skip{{Skip — already classified}}
+  FP --> EMB[🧮 Embedding stage<br/>all-minilm 384d · CLIP for images · code-bert for code]
+  EMB -->|store| LDB[(LanceDB vectors)]
+  EMB --> CL{Classifier ensemble}
+
+  CL --> A1[🔵 kNN k=5<br/>vote from labeled set]
+  CL --> A2[🟣 BERTopic<br/>cluster → c-TF-IDF label]
+  CL --> A3[🟢 LLM zero-shot<br/>Gemini Flash / qwen3]
+
+  A1 --> EN[Ensemble Voter<br/>weighted by per-algo F1<br/>+ entropy = uncertainty]
+  A2 --> EN
+  A3 --> EN
+
+  EN -->|category + confidence| ALIGN[Align to BusinessContext domains]
+  ALIGN --> CONF{conf &lt; threshold?}
+  CONF -->|yes| REV[📥 _Review/<br/>HITL queue]
+  CONF -->|no| DOM{domain<br/>match?}
+  DOM -->|no| UNS[🔎 _Unsorted/<br/>HITL queue]
+  DOM -->|yes| PLACE[✅ domain/bucket/file<br/>auto-placed]
+
+  REV --> PER[(decisions/file_id.json<br/>cat · conf · per-algo · sha · model versions)]
+  UNS --> PER
+  PLACE --> PER
+
+  classDef built fill:#56d364,color:#000,stroke:#56d364;
+  classDef build fill:#ffa657,color:#000,stroke:#ffa657;
+  classDef gap fill:#f85149,color:#fff,stroke:#f85149;
+  class PLACE,REV,UNS,PER built;
+  class CL,A1,A2,A3,EN,ALIGN,CONF,DOM build;
+  class EMB built;
+</div>
+</div>
+
+<h2>2 · HITL feedback &amp; learning loop</h2>
+<div class="panel">
+<div class="mermaid">
+flowchart LR
+  IB[📥 Review/Unsorted Inbox<br/>Streamlit · MCP — both surfaces] --> U[👤 User triage]
+  U -->|correct category| LS[(Labels Store<br/>append-only)]
+  U -->|trash| TR[🗑️ _Trash/]
+  U -->|skip| SKIP[no-op]
+
+  LS -->|immediate| KNN[kNN index<br/>incremental add]
+  LS -->|every N labels| ST[SetFit retrain job]
+  LS -->|domain anchors| BT[BERTopic seed update]
+  LS -->|few-shot examples| LLM[LLM example bank]
+
+  KNN --> NEW[next-scan classification]
+  ST --> NEW
+  BT --> NEW
+  LLM --> NEW
+
+  NEW --> METRICS[F1 / accuracy / calibration<br/>per algorithm]
+  METRICS -->|drop| ALARM[⚠️ regression alarm → rollback]
+
+  classDef hitl fill:#58a6ff,color:#000;
+  classDef learn fill:#ffa657,color:#000;
+  class IB,U,LS hitl;
+  class KNN,ST,BT,LLM,NEW,METRICS,ALARM learn;
+</div>
+</div>
+
+<h2>3 · Drift &amp; lifecycle</h2>
+<div class="panel">
+<div class="mermaid">
+flowchart TD
+  DD[🔄 Drift Detector<br/>nightly / on-demand] --> EVT{Event type?}
+  EVT -->|sha256 mismatch| EDITED[File content changed<br/>→ re-embed + reclassify]
+  EVT -->|path missing| ORPH[File deleted<br/>→ orphan vector cleanup]
+  EVT -->|new path, same hash| MOVED[File relocated<br/>→ update path, keep vector]
+  EVT -->|user moved in OUTPUT| LBL[User signal<br/>→ append positive label]
+  EVT -->|embedding model bumped| STALE[Mark vectors stale<br/>→ batch reindex]
+  EVT -->|BusinessContext changed| DOMR[Re-vote all kNN labels<br/>→ propose new INDEX.md]
+
+  classDef drift fill:#f85149,color:#fff;
+  classDef act fill:#56d364,color:#000;
+  class DD,EVT drift;
+  class EDITED,ORPH,MOVED,LBL,STALE,DOMR act;
+</div>
+</div>
+
+<h2>4 · Module layout (proposed)</h2>
+<div class="panel">
+<pre style="color:#e6edf3; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; line-height: 1.6;">
+src/rex/ml/
+├── provider.py              <span style="color:#56d364">(existing)</span> LLM client
+├── vision.py                <span style="color:#56d364">(existing)</span> Gemini vision
+└── classifier/              <span style="color:#ffa657">NEW — plug-and-play module</span>
+    ├── __init__.py
+    ├── base.py              # Protocol: fit() / predict() / explain()
+    ├── registry.py          # name → factory; YAML-driven swap
+    ├── algorithms/
+    │   ├── knn.py           # default, uses LanceDB ANN
+    │   ├── bertopic.py      # discovery + auto-labels
+    │   ├── setfit.py        # SOTA few-shot (Phase 2)
+    │   ├── llm_zero_shot.py # cold-start
+    │   ├── llm_few_shot.py  # warm-start with label examples
+    │   └── ensemble.py      # weighted vote across algorithms
+    ├── lifecycle/
+    │   ├── train.py         # rebuild from corrections
+    │   ├── eval.py          # F1 / accuracy / calibration metrics
+    │   ├── drift_detector.py# sha256 / path / model-version drift
+    │   └── snapshot.py      # versioned model artifacts
+    └── config_schema.py     # per-domain profile (algo + hparams)
+</pre>
+</div>
+
+<h2>5 · Per-domain config example</h2>
+<div class="panel">
+<pre style="color:#e6edf3; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; line-height: 1.6;">
+<span style="color:#ffa657"># .raven/classifier_config.yaml</span>
+algorithms:
+  default: ensemble
+  ensemble:
+    members: [knn, bertopic, llm_zero_shot]
+    weights: [0.5, 0.3, 0.2]      <span style="color:#8b949e"># tuned from per-algo F1</span>
+
+per_domain:
+  - match: "Marketing/*"
+    classifier: setfit
+    retrain_threshold: 50
+    fallback: knn
+
+  - match: "Code/*"
+    classifier: knn
+    k: 7
+    embedding: code-bert          <span style="color:#8b949e"># swap embedder per domain</span>
+
+  - match: "Images/*"
+    classifier: clip_zero_shot
+    candidate_labels_from: business_context.domains
+
+drift:
+  schedule: "0 3 * * *"           <span style="color:#8b949e"># nightly 3am</span>
+  staleness_alarm_pct: 5
+</pre>
+</div>
+
+<h2>6 · Build status snapshot</h2>
+<table>
+<tr><th>Component</th><th>Status</th><th>Where</th></tr>
+<tr><td>Fingerprint stage</td><td><span class="pill ok">Built</span></td><td>rex/agents/scanner.py</td></tr>
+<tr><td>Embedding stage</td><td><span class="pill ok">Built</span></td><td>rex/ml/provider.py + LanceDB</td></tr>
+<tr><td>Vision describe</td><td><span class="pill ok">Built</span></td><td>rex/ml/vision.py (Gemini)</td></tr>
+<tr><td>LLM zero-shot router</td><td><span class="pill ok">Built</span></td><td>rex/agents/router.py — qwen3</td></tr>
+<tr><td>SortEngine routing</td><td><span class="pill ok">Built</span></td><td>rex/agents/sort_engine.py</td></tr>
+<tr><td>INDEX.md generator</td><td><span class="pill ok">Built</span></td><td>rex/agents/sort_engine_index.py</td></tr>
+<tr><td>Onboarding wizard</td><td><span class="pill ok">Built</span></td><td>rex/ui/pages_onboard.py</td></tr>
+<tr><td>Review (HITL) page</td><td><span class="pill ok">Built</span></td><td>rex/ui/pages_review.py</td></tr>
+<tr><td>Confidence emission</td><td><span class="pill bad">Gap</span></td><td>router_prompt.py needs `confidence` in JSON schema</td></tr>
+<tr><td>kNN classifier</td><td><span class="pill warn">To Build</span></td><td>rex/ml/classifier/algorithms/knn.py</td></tr>
+<tr><td>BERTopic classifier</td><td><span class="pill warn">To Build</span></td><td>rex/ml/classifier/algorithms/bertopic.py</td></tr>
+<tr><td>Ensemble voter</td><td><span class="pill warn">To Build</span></td><td>rex/ml/classifier/algorithms/ensemble.py</td></tr>
+<tr><td>Drift detector</td><td><span class="pill warn">To Build</span></td><td>rex/ml/classifier/lifecycle/drift_detector.py</td></tr>
+<tr><td>Retrain pipeline</td><td><span class="pill warn">To Build</span></td><td>rex/ml/classifier/lifecycle/train.py</td></tr>
+<tr><td>MCP exposure</td><td><span class="pill warn">To Build</span></td><td>rex/mcp/server.py (existing, needs new tools)</td></tr>
+<tr><td>GraphRAG (entities)</td><td><span class="pill warn">To Build</span></td><td>Phase 2 — separate from classifier</td></tr>
+</table>
+
+<footer>
+  <p>
+    Diagram source: <code>docs/diagrams/classification-pipeline.html</code>
+    · Generated: 2026-06-06 · Author: Andie + andie-jr
+  </p>
+  <p>
+    <b>Raven boundary callout:</b> The runtime classifier lives in
+    <code>src/rex/ml/classifier/</code> — it is part of Rex, not Raven. Raven's
+    <code>aiml-specialist</code> and <code>ml-ops-specialist</code> skills are
+    advisory; they can review this code, but the package itself is owned by Rex.
+  </p>
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    flowchart: { curve: 'basis', useMaxWidth: true },
+    securityLevel: 'loose'
+  });
+</script>
+</body>
+</html>

@@ -24,6 +24,7 @@ import structlog
 from rex.mcp.tools_jobs import register_job_tools
 from rex.mcp.tools_projects import _project_dict, register_project_tools
 from rex.mcp.tools_query import register_query_tools
+from rex.mcp.tools_review import register_review_tools
 
 __all__ = [
     "build_mcp_app",
@@ -49,6 +50,7 @@ def build_mcp_app():
     register_project_tools(app)
     register_job_tools(app)
     register_query_tools(app)
+    register_review_tools(app)
     return app
 
 

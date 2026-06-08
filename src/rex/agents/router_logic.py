@@ -94,6 +94,14 @@ class RouterLogicMixin:
         if action_raw not in {"keep", "archive", "trash"}:
             action_raw = "keep"
         reasoning = str(data.get("reasoning", "Classified by Rex router")).strip()[:500]
+        # Confidence — LLM self-reported; clamp to [0, 1]. Default 0.5 if missing
+        # so legacy LLMs that ignore the new field don't silently route everything
+        # to auto-place. 0.5 will trip the default 0.7 threshold → _Review/.
+        try:
+            confidence = float(data.get("confidence", 0.5))
+        except (TypeError, ValueError):
+            confidence = 0.5
+        confidence = max(0.0, min(1.0, confidence))
 
         return FileDecision(
             category=category,
@@ -101,6 +109,7 @@ class RouterLogicMixin:
             relevance=relevance,
             action=FileAction(action_raw),
             reasoning=reasoning,
+            confidence=confidence,
             duplicate_of=None,
             dedup_status=DedupStatus.UNIQUE,
         )

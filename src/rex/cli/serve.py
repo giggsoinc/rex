@@ -15,7 +15,9 @@ import sys
 from rich.console import Console
 from rich.panel import Panel
 
-console = Console()
+# Route ALL human-facing output to stderr — stdout must stay pure JSON-RPC
+# for the stdio MCP transport (banners on stdout corrupt the protocol stream).
+console = Console(stderr=True)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -12,9 +12,12 @@ from __future__ import annotations
 
 import structlog
 
+from rex.agents.classifier_router import ClassifierRouter
 from rex.agents.organizer import LocalOrganizer
 from rex.agents.router import LLMRouter
 from rex.agents.scanner import LocalScanner
+from rex.ml.classifier import get_classifier
+from rex.ml.classifier.base import Classifier
 from rex.config import Settings, VectorStoreType, get_settings
 from rex.ml.provider import ModelProvider
 from rex.ml.vision import VisionEngine
@@ -42,6 +45,39 @@ def build_default_pipeline(settings: Settings | None = None) -> RexPipeline:
     router = LLMRouter(model_provider, s)
     organizer = LocalOrganizer(job_store, s)
 
+    return RexPipeline(scanner, router, organizer, vector_store, job_store, s)
+
+
+def build_classifier_pipeline(
+    classifier_name: str = "knn",
+    classifier: Classifier | None = None,
+    settings: Settings | None = None,
+    **classifier_kwargs,
+) -> RexPipeline:
+    """Construct a pipeline that uses the plug-and-play classifier module.
+
+    Args:
+        classifier_name: name from registry (knn / llm_zero_shot / ensemble).
+                         Ignored if `classifier` is provided directly.
+        classifier:      pre-built Classifier instance (preferred for ensemble).
+        settings:        Rex Settings; defaults to get_settings().
+        **classifier_kwargs: forwarded to the registry factory when building by name.
+
+    The resulting pipeline routes through ClassifierRouter instead of LLMRouter,
+    giving real ML-driven confidence and an easy retrain path via the lifecycle
+    helpers in rex.ml.classifier.lifecycle.
+    """
+    s = settings or get_settings()
+    model_provider = ModelProvider(s)
+    vision_engine = VisionEngine(s)
+    vector_store = get_vector_store(s)
+    job_store = JobStore(base_path="~/rex-data/jobs")
+
+    clf = classifier or get_classifier(classifier_name, **classifier_kwargs)
+    scanner = LocalScanner(model_provider, vision_engine, vector_store, job_store, s)
+    router = ClassifierRouter(classifier=clf, settings=s)
+    organizer = LocalOrganizer(job_store, s)
+    logger.info("classifier_pipeline_built", classifier=clf.name)
     return RexPipeline(scanner, router, organizer, vector_store, job_store, s)
 
 
