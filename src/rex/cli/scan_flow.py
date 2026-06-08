@@ -23,9 +23,26 @@ from rex.projects.model import Project
 console = Console()
 
 
-async def _run(src_path: Path, project: Project, workers: int, mode: str, soft: bool, yes: bool) -> int:
-    """The full scan flow."""
+async def _run(
+    src_path: Path, project: Project, workers: int, mode: str,
+    soft: bool, yes: bool, output_override: str | None = None,
+) -> int:
+    """The full scan flow.
+
+    If output_override is provided, it replaces project.output_path for this
+    run AND is stamped onto the project (so downstream stages — coordinator,
+    janitor, preflight — all see the same path).
+    """
     settings = get_settings()
+
+    # Apply output override before any stage reads project.output_path
+    if output_override:
+        resolved = str(Path(output_override).expanduser().resolve())
+        console.print(
+            f"[cyan]Output path override:[/cyan] {project.output_path} → {resolved}"
+        )
+        project.output_path = resolved
+        Path(resolved).mkdir(parents=True, exist_ok=True)
 
     # 1. Quick file count for intent dialog
     file_count, total_bytes = await _quick_count(str(src_path))

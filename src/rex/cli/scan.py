@@ -23,14 +23,18 @@ console = Console()
 
 
 def main(argv: list[str] | None = None) -> int:
-    """`rex scan <folder> [--project NAME] [--workers N] [--mode asyncio|mp] [--soft] [-y]`"""
+    """`rex scan <folder> [--project NAME] [--output PATH] [--workers N] [--mode asyncio|mp] [--soft] [-y]`"""
     argv = argv or sys.argv[1:]
     if not argv:
-        console.print("[red]Usage:[/red] rex scan <folder> [--project <name>] [--workers N] [--mode asyncio|mp] [--soft]")
+        console.print(
+            "[red]Usage:[/red] rex scan <folder> [--project <name>] "
+            "[--output <path>] [--workers N] [--mode asyncio|mp] [--soft]"
+        )
         return 1
 
     source = argv[0]
     project_name: str | None = None
+    output_override: str | None = None
     workers = 4
     mode = "asyncio"
     soft = False
@@ -41,6 +45,8 @@ def main(argv: list[str] | None = None) -> int:
         a = argv[i]
         if a == "--project" and i + 1 < len(argv):
             project_name = argv[i + 1]; i += 2
+        elif a == "--output" and i + 1 < len(argv):
+            output_override = argv[i + 1]; i += 2
         elif a == "--workers" and i + 1 < len(argv):
             workers = int(argv[i + 1]); i += 2
         elif a == "--mode" and i + 1 < len(argv):
@@ -71,4 +77,4 @@ def main(argv: list[str] | None = None) -> int:
         if project is None:
             return 0
 
-    return asyncio.run(_run(src_path, project, workers, mode, soft, yes))
+    return asyncio.run(_run(src_path, project, workers, mode, soft, yes, output_override))

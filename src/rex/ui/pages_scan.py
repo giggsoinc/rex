@@ -8,6 +8,7 @@ from pathlib import Path
 import streamlit as st
 
 from rex.orchestrator.builder import build_default_pipeline
+from rex.projects.context_store import ContextStore
 
 
 def page_scan() -> None:
@@ -19,9 +20,25 @@ def page_scan() -> None:
     output = st.text_input(
         "Output path",
         value=str(Path.home() / "rex-data" / "output"),
-        help="Where Rex will write organized output (it will not modify your source folder)",
+        help=(
+            "Where Rex will write organized output (it will not modify your source folder). "
+            "This path is HONORED — it overrides project defaults and REX_STORAGE_PATH."
+        ),
     )
     name = st.text_input("Job name (optional)", value="")
+
+    # Show whether SortEngine will be active (BusinessContext present)
+    ctx = ContextStore().get_for_project()
+    if ctx and ctx.domains:
+        st.info(
+            f"🎯 SortEngine active — domains: **{', '.join(ctx.domains)}**. "
+            f"Threshold {ctx.confidence_threshold}. Output uses Domain/Type taxonomy."
+        )
+    else:
+        st.warning(
+            "⚠️ No BusinessContext set — using **legacy organizer** "
+            "(type-only folders). Visit 🚀 Onboard first for Domain/Type sorting."
+        )
 
     if st.button("Start scan", type="primary"):
         src = Path(folder).expanduser()

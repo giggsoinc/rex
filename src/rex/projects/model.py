@@ -70,7 +70,15 @@ class Project(BaseModel):
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         vector_dir = root_path / f"vectors_{name}_{timestamp}.lance"
         jobs_dir = root_path / "jobs"
-        output_dir = root_path / "output"
+
+        # Output path honors REX_STORAGE_PATH env var if set (with /{name} suffix
+        # to keep multiple projects isolated). Falls back to <root>/output.
+        import os
+        storage_root = os.environ.get("REX_STORAGE_PATH", "").strip()
+        if storage_root:
+            output_dir = Path(storage_root).expanduser().resolve() / name
+        else:
+            output_dir = root_path / "output"
 
         return cls(
             name=name,
