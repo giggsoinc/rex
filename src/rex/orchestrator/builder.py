@@ -18,6 +18,7 @@ from rex.agents.router import LLMRouter
 from rex.agents.scanner import LocalScanner
 from rex.ml.classifier import get_classifier
 from rex.ml.classifier.base import Classifier
+from rex.projects.context_store import ContextStore
 from rex.config import Settings, VectorStoreType, get_settings
 from rex.ml.provider import ModelProvider
 from rex.ml.vision import VisionEngine
@@ -118,6 +119,16 @@ def build_project_pipeline(project: Project, settings: Settings | None = None) -
     # Stamp the pipeline with project metadata for downstream consumers
     pipeline.project_name = project.name
     pipeline.project_output_path = project.output_path
+
+    # Load BusinessContext if the project has one — promotes Stage 3 to SortEngine.
+    # Looks for .raven/business_context.json under the project root (and CWD).
+    ctx = ContextStore().get_for_project(project.root_path) or ContextStore().get_for_project()
+    if ctx is not None and ctx.domains:
+        pipeline.business_context = ctx
+        logger.info("project_pipeline_sort_enabled", name=project.name, domains=ctx.domains)
+    else:
+        logger.info("project_pipeline_legacy_organize", name=project.name)
+
     logger.info(
         "project_pipeline_built",
         name=project.name,

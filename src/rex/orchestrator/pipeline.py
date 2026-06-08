@@ -1,18 +1,16 @@
-"""Rex pipeline — orchestrates Scanner → Router → Organizer sequentially.
-
-Designed for raw asyncio (no Prefect dep for ideation). Easy to swap to Prefect
-or any orchestrator later — agents are pluggable via contracts.py protocols.
-"""
+"""Rex pipeline — orchestrates Scanner → Router → Organize/Sort. Asyncio."""
 
 from __future__ import annotations
 
 import structlog
 
 from rex.config import Settings, get_settings
+from rex.models.business_context import BusinessContext
 from rex.models.schemas import JobStatus, ScanJob
 from rex.orchestrator.contracts import OrganizerAgent, RouterAgent, ScannerAgent
+from rex.orchestrator.pipeline_dispatch import dispatch_stage3
 from rex.orchestrator.pipeline_progress import PipelineProgress, ProgressCallback
-from rex.orchestrator.pipeline_stages import run_organize_stage, run_route_stage
+from rex.orchestrator.pipeline_stages import run_route_stage
 from rex.orchestrator.state import JobStore
 from rex.vectorstore import VectorStore
 
@@ -45,6 +43,9 @@ class RexPipeline:
         # Stamped by builder when the pipeline belongs to a project
         self.project_name: str = ""
         self.project_output_path: str = ""
+        # When set, Stage 3 dispatches to SortEngine (Domain/Type + _Review/
+        # _Unsorted/_Stale + INDEX.md). Else legacy LocalOrganizer.
+        self.business_context: BusinessContext | None = None
 
     async def run(self, source_path: str, output_path: str | None = None, name: str = "") -> ScanJob:
         """Execute the full pipeline on a source folder.
@@ -104,26 +105,28 @@ class RexPipeline:
             await self.job_store.update_job(job)
             progress.categories = job.categories_discovered
 
-            # Stage 3: Organize (move/copy + sidecars)
-            await run_organize_stage(
+            # Stage 3: Dispatch — SortEngine when BusinessContext set,
+            # else legacy LocalOrganizer. See pipeline_dispatch.py.
+            job.status = await dispatch_stage3(
+                business_context=self.business_context,
                 organizer=self.organizer,
                 contexts=contexts,
                 decisions=decisions,
                 output_path=output_path,
                 progress=progress,
                 emit=self._emit,
+                job_store=self.job_store,
+                job_id=job.id,
             )
-
-            # Finalize: build catalog
-            await self.organizer.finalize(job.id, output_path)
-
             job.organized_files = progress.organized
-            job.status = JobStatus.COMPLETE
             await self.job_store.update_job(job)
 
-            progress.status = JobStatus.COMPLETE
+            progress.status = job.status
             await self._emit(progress)
-            logger.info("pipeline_complete", job_id=job.id, files=progress.organized)
+            logger.info(
+                "pipeline_complete", job_id=job.id,
+                files=progress.organized, status=job.status.value,
+            )
             return job
 
         except Exception as e:
