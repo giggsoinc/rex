@@ -57,20 +57,18 @@ class ModelProvider(BedrockBackendMixin):
     async def embed(self, text: str) -> list[float]:
         """Generate embedding vector for text.
 
+        Embeddings are DECOUPLED from llm_provider. settings.embed_model points
+        at an Ollama embedding model (default all-minilm:latest). The text
+        generation LLM (qwen3, Gemini, Claude) is independent — it does not
+        determine which embedder runs.
+
         Args:
             text: Text to embed.
 
         Returns:
-            Embedding vector (384d for all-minilm).
+            Embedding vector (384-d for all-minilm).
         """
-        provider = self.settings.llm_provider
-
-        if provider == LLMProvider.OLLAMA:
-            return await self._ollama_embed(text)
-        elif provider == LLMProvider.BEDROCK:
-            return await self._bedrock_embed(text)
-        else:
-            raise ValueError(f"Unsupported provider for embeddings: {provider}")
+        return await self._ollama_embed(text)
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Batch embed multiple texts concurrently.
