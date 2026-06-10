@@ -53,6 +53,16 @@ rex-data/
 .raven/manifest.secrets.json
 .raven/.cache/
 
+# Raven runtime state (per-machine — never commit)
+.raven/.model-session.json
+.raven/audit/
+
+# Rex LiteLLM usage log (per-machine cost telemetry)
+.raven/usage.jsonl
+
+# Claude Code local permissions cache (per-machine)
+.claude/
+
 # Local env with secrets — never commit
 .env.local
 .env.*.local
