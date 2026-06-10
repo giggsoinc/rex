@@ -49,13 +49,37 @@ are opt-in per folder.
 
 ## Quick Start
 
+### System dependencies (install once)
+
+Rex needs a few native binaries that pip can't install. On macOS:
+
+```bash
+brew install ollama                  # local LLM backend (required for default profile)
+brew install --cask libreoffice      # legacy .doc/.xls/.ppt extraction (optional, recommended)
+brew install tesseract               # offline OCR fallback (optional)
+brew install ffmpeg                  # video metadata (optional)
+```
+
+On Linux:
+```bash
+curl -fsSL https://ollama.com/install.sh | sh    # ollama
+sudo apt install libreoffice tesseract-ocr ffmpeg
+```
+
+Run `rex doctor` at any time to see what's installed vs missing.
+
+### Install + first scan
+
 ```bash
 # 1. Clone & install
 git clone https://github.com/giggsoinc/rex.git
 cd rex
 pip install -e .
 
-# 2. Initialize (picks deployment + vector store)
+# 2. Health check (do this first!)
+rex doctor
+
+# 3. Initialize (picks deployment + vector store)
 rex init
 
 # 3. UI

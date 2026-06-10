@@ -48,6 +48,10 @@ def main() -> int:
         from rex.cli.tail import main as tail_main
         return tail_main(sys.argv[2:])
 
+    if cmd == "doctor":
+        from rex.cli.doctor import main as doctor_main
+        return doctor_main(sys.argv[2:])
+
     # Other commands stubs
     if cmd in {"search", "status"}:
         console.print(f"[yellow]'{cmd}' command coming next[/yellow]")
@@ -70,6 +74,7 @@ def print_help() -> None:
         "  [cyan]rex search[/cyan] <query>        Semantic search across organized files\n"
         "  [cyan]rex status[/cyan]                Show current job status\n"
         "  [cyan]rex tail[/cyan] [job_id]         Live-stream job progress (tail -f style)\n"
+        "  [cyan]rex doctor[/cyan] [--strict]     Check system deps + Python libs\n"
     )
 
 
