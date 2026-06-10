@@ -35,40 +35,42 @@ class ModelProvider(BedrockBackendMixin):
         return self._ollama_client
 
     async def generate(self, prompt: str, system: str = "", json_mode: bool = True) -> str:
-        """Generate text from the configured LLM provider.
+        """Generate text — routes through LiteLLM task router (task='classify').
 
-        Args:
-            prompt: User prompt to send.
-            system: System prompt.
-            json_mode: If True, request JSON output format.
+        Existing callers see no API change. Behind the scenes, this now goes
+        through rex.ml.routing.get_router() which picks the model + fallback
+        chain based on .raven/llm_routing.yaml (default: ollama/qwen3:8b →
+        gemini/flash-lite). Cost logged to .raven/usage.jsonl per call.
 
-        Returns:
-            Raw text response from the model.
+        Falls back to the legacy direct-Ollama path if routing fails (e.g.
+        LiteLLM not installed) so existing scans never break.
         """
-        provider = self.settings.llm_provider
-
-        if provider == LLMProvider.OLLAMA:
-            return await self._ollama_generate(prompt, system, json_mode)
-        elif provider == LLMProvider.BEDROCK:
-            return await self._bedrock_generate(prompt, system, json_mode)
-        else:
+        try:
+            from rex.ml.routing import get_router
+            return await get_router().chat(
+                task="classify", prompt=prompt, system=system, json_mode=json_mode,
+            )
+        except Exception as e:
+            logger.warning("routing_generate_fell_back_to_legacy", error=str(e)[:160])
+            provider = self.settings.llm_provider
+            if provider == LLMProvider.OLLAMA:
+                return await self._ollama_generate(prompt, system, json_mode)
+            if provider == LLMProvider.BEDROCK:
+                return await self._bedrock_generate(prompt, system, json_mode)
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
     async def embed(self, text: str) -> list[float]:
-        """Generate embedding vector for text.
+        """Embed text — routes through LiteLLM task router (task='embed').
 
-        Embeddings are DECOUPLED from llm_provider. settings.embed_model points
-        at an Ollama embedding model (default all-minilm:latest). The text
-        generation LLM (qwen3, Gemini, Claude) is independent — it does not
-        determine which embedder runs.
-
-        Args:
-            text: Text to embed.
-
-        Returns:
-            Embedding vector (384-d for all-minilm).
+        Default chain: ollama/all-minilm (local) with no cloud fallback (free).
+        Falls back to direct Ollama if routing fails so scans never break.
         """
-        return await self._ollama_embed(text)
+        try:
+            from rex.ml.routing import get_router
+            return await get_router().embed(task="embed", text=text)
+        except Exception as e:
+            logger.warning("routing_embed_fell_back_to_legacy", error=str(e)[:160])
+            return await self._ollama_embed(text)
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Batch embed multiple texts concurrently.
