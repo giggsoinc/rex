@@ -74,11 +74,25 @@ class ContextStore:
     def save_for_project(
         self, context: BusinessContext, project_root: Path | str = "."
     ) -> Path:
-        """Persist BusinessContext as project-wide default."""
+        """Persist BusinessContext as project-wide default.
+
+        Also exports REX_LLM_PROFILE so the LiteLLM router immediately
+        picks up the chosen model profile for this process. Note: env
+        vars don't persist across processes — set in .env.local too if
+        you want it sticky.
+        """
         path = Path(project_root) / _PROJECT_PATH
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(context.model_dump_json(indent=2))
-        logger.info("context_saved_project", path=str(path))
+        import os
+        os.environ["REX_LLM_PROFILE"] = context.model_profile.value
+        # Invalidate the cached router so the new profile takes effect
+        try:
+            from rex.ml.routing import reset_router
+            reset_router()
+        except ImportError:
+            pass
+        logger.info("context_saved_project", path=str(path), profile=context.model_profile.value)
         return path
 
     # --- Convenience ---

@@ -16,6 +16,7 @@ from rex.ml.classifier import ClassifierRegistry
 from rex.ml.classifier import algorithms as _algos  # noqa: F401 — triggers registration
 from rex.models.business_context import BusinessContext, ModelProfile
 from rex.projects.context_store import ContextStore
+from rex.ui.pages_settings_routing import routing_section
 from rex.ui.secrets_io import is_set, list_known_keys, read_masked, write_secret
 
 __all__ = ["page_settings"]
@@ -121,10 +122,10 @@ def _classifier_section() -> None:
 
 
 def page_settings() -> None:
-    """Editable Settings page — system info + business context + secrets + classifier."""
+    """Editable Settings page — system / business / secrets / classifier / routing."""
     st.title("⚙️ Settings")
-    tab_sys, tab_biz, tab_sec, tab_clf = st.tabs(
-        ["🖥️ System", "🎯 Business", "🔐 Secrets", "🧠 Classifier"]
+    tab_sys, tab_biz, tab_sec, tab_clf, tab_rt = st.tabs(
+        ["🖥️ System", "🎯 Business", "🔐 Secrets", "🧠 Classifier", "🚦 Routing"]
     )
     with tab_sys:
         _system_section()
@@ -134,3 +135,5 @@ def page_settings() -> None:
         _secrets_section()
     with tab_clf:
         _classifier_section()
+    with tab_rt:
+        routing_section()
