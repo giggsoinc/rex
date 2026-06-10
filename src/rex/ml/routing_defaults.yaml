@@ -1,0 +1,67 @@
+# Rex bundled routing defaults — LiteLLM provider/model selection per task.
+# Override per-project in <project>/.raven/llm_routing.yaml (merged on top).
+#
+# Provider/model format follows LiteLLM convention:
+#   ollama/<model>            → local Ollama
+#   gemini/<model>            → Google Gemini (needs GEMINI_API_KEY)
+#   openai/<model>            → OpenAI (needs OPENAI_API_KEY)
+#   anthropic/<model>         → Claude (needs ANTHROPIC_API_KEY)
+#   bedrock/<model>           → AWS Bedrock (needs AWS creds)
+#   groq/<model>              → Groq (needs GROQ_API_KEY)
+
+active_profile: balanced
+
+tasks:
+  embed:
+    primary: ollama/all-minilm:latest
+    fallback: []                                # no cloud fallback by default
+    max_cost_per_call_usd: null
+
+  classify:
+    primary: ollama/qwen3:8b
+    fallback:
+      - gemini/gemini-2.0-flash-lite
+    max_cost_per_call_usd: 0.001
+
+  vision_describe:
+    primary: gemini/gemini-2.0-flash-lite
+    fallback:
+      - openai/gpt-4o-mini
+    max_cost_per_call_usd: 0.005
+
+  entity_extraction:
+    primary: gemini/gemini-2.0-flash
+    fallback:
+      - anthropic/claude-haiku-4-5
+    max_cost_per_call_usd: 0.01
+
+  reason:
+    primary: anthropic/claude-sonnet-4-5
+    fallback:
+      - openai/gpt-4o
+    max_cost_per_call_usd: 0.10
+
+profiles:
+  # All-local — free, slower, privacy-first.
+  local:
+    task_overrides:
+      embed:           {primary: ollama/all-minilm:latest, fallback: []}
+      classify:        {primary: ollama/qwen3:8b, fallback: []}
+      vision_describe: {primary: ollama/llava:latest, fallback: []}
+      entity_extraction: {primary: ollama/qwen3:8b, fallback: []}
+      reason:          {primary: ollama/qwen3:8b, fallback: []}
+
+  # Mix of local + cheap cloud — DEFAULT.
+  balanced:
+    task_overrides: {}    # uses the top-level tasks above
+
+  # Premium cloud everywhere.
+  premium:
+    task_overrides:
+      classify:        {primary: gemini/gemini-2.0-flash, fallback: [anthropic/claude-haiku-4-5]}
+      vision_describe: {primary: anthropic/claude-sonnet-4-5, fallback: [openai/gpt-4o]}
+      entity_extraction: {primary: anthropic/claude-sonnet-4-5, fallback: [openai/gpt-4o]}
+
+  # Custom — user takes over fully via their YAML.
+  custom:
+    task_overrides: {}

@@ -41,6 +41,7 @@ are opt-in per folder.
 | 📥 **Resumable scans** | Kill anytime; rerun resumes from disk truth |
 | 📡 **MCP-native** | 12 tools so Claude / Cursor / browsers can query Rex |
 | 💚 **Local by default** | Ollama + all-minilm + LanceDB. Cloud LLMs opt-in per folder |
+| 🚦 **LiteLLM task router** | Per-task model + fallback chain. Cheap stages local, quality stages cloud. Cost logged per call. |
 | 🔐 **Editable Settings** | Masked secrets, model profile picker, per-domain config |
 | 🟢 **Live job tracking** | Heartbeat-backed Jobs page + `rex tail` CLI |
 
@@ -111,6 +112,27 @@ LanceDB         FileRecord    ◀── job_id = sha256(source_path)[:16]
 Full Mermaid diagram: [`docs/diagrams/classification-pipeline.html`](docs/diagrams/classification-pipeline.html)
 
 ---
+
+## LiteLLM Task Router (per-task model selection)
+
+Rex names every LLM call a "task" and routes each task through LiteLLM with a
+primary model + fallback chain:
+
+| Task | Default primary | Fallback | Per call |
+|---|---|---|---|
+| embed | Ollama `all-minilm` (local) | — | $0 |
+| classify | Ollama `qwen3:8b` (local) | Gemini Flash-Lite | $0 → $0.0001 |
+| vision_describe | Gemini Flash-Lite | GPT-4o-mini | $0.0003 |
+| entity_extraction (Phase 2) | Gemini Flash | Claude Haiku | $0.001 |
+| reason | Claude Sonnet | GPT-4o | $0.02 |
+
+Routing lives in `.raven/llm_routing.yaml`. `BusinessContext.model_profile`
+selects a bundled profile (`local`, `balanced`, `premium`, `custom`).
+Every call is appended to `.raven/usage.jsonl` with `task`, `model`,
+`input_tokens`, `output_tokens`, `cost_usd`, `fallback_used`.
+
+See [`docs/architecture.md#litellm-task-router`](docs/architecture.md#litellm-task-router)
+for the full diagram, config schema, and provider matrix.
 
 ## Storage Model
 

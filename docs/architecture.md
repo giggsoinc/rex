@@ -109,6 +109,112 @@ graph LR
     ROUTER --> OUTPUT
 ```
 
+## LiteLLM Task Router
+
+Rex routes each pipeline stage to a different model via **LiteLLM**, a unified
+OpenAI-compatible client that supports 100+ providers (Ollama, Gemini, Claude,
+GPT, Bedrock, Groq, …). The router lets cheap stages run locally and expensive
+stages escalate to cloud — per scan, per task.
+
+### Why a router
+
+| Without router | With router |
+|---|---|
+| One global `llm_provider` for everything | Per-task model + fallback chain |
+| Embedding goes through the LLM provider too | Embed = local, generate = cloud (independent) |
+| No cost visibility per scan | Cost logged per call to `.raven/usage.jsonl` |
+| Provider errors blow up the scan | Built-in fallback chain — retries before fail |
+| One global `BusinessContext.model_profile` is decorative | model_profile selects a routing YAML profile |
+
+### Architecture
+
+```mermaid
+graph LR
+    subgraph TASKS["Pipeline stages — each names a 'task'"]
+        EMB["embed()"]
+        CLS["classify()"]
+        VIS["vision_describe()"]
+        EXT["extract_entities()<br/>(Phase 2)"]
+        REA["reason()"]
+    end
+    subgraph ROUTER["rex/ml/routing.py — LiteLLM adapter"]
+        YAML[".raven/llm_routing.yaml<br/>profiles + per-task chains"]
+        ROUTE["routing.get_model(task=)"]
+        FB["fallback chain<br/>primary → 2nd → ..."]
+        BUDGET["max_cost_per_call_usd<br/>guardrail"]
+        YAML --> ROUTE
+        ROUTE --> FB
+        ROUTE --> BUDGET
+    end
+    subgraph PROVIDERS["Providers (via LiteLLM)"]
+        OLL[Ollama local<br/>qwen3:8b · all-minilm]
+        GEM[Gemini Flash / Flash-Lite]
+        CLD[Claude Haiku / Sonnet]
+        GPT[OpenAI GPT-4o / mini]
+        BED[AWS Bedrock]
+        GRQ[Groq]
+    end
+    subgraph LOG["Observability"]
+        USE[".raven/usage.jsonl<br/>per-call tokens + cost + model + task"]
+    end
+    TASKS --> ROUTER
+    ROUTER --> PROVIDERS
+    PROVIDERS --> USE
+```
+
+### Routing config (`.raven/llm_routing.yaml`)
+
+```yaml
+tasks:
+  embed:
+    primary: ollama/all-minilm:latest      # free, local
+    fallback: []
+  classify:
+    primary: ollama/qwen3:8b               # local first
+    fallback: [gemini/gemini-2.0-flash-lite]
+    max_cost_per_call_usd: 0.001
+  vision_describe:
+    primary: gemini/gemini-2.0-flash-lite
+    fallback: [openai/gpt-4o-mini]
+  entity_extraction:                       # Phase 2 GraphRAG
+    primary: gemini/gemini-2.0-flash
+    fallback: [anthropic/claude-haiku-4-5]
+  reason:
+    primary: anthropic/claude-sonnet-4-5
+    fallback: [openai/gpt-4o]
+    max_cost_per_call_usd: 0.10
+
+profiles:
+  local:    {all_tasks: ollama}                   # privacy-first, free
+  balanced: {embed_classify: ollama, vision_extract: gemini}  # default
+  premium:  {classify: gemini→claude, vision_extract: claude}
+  custom:   user_override                         # full YAML control
+```
+
+The active profile comes from `BusinessContext.model_profile` (set in
+🚀 Onboard) — no code change to swap.
+
+### Provider × Task Matrix (`balanced` profile)
+
+| Task | Primary | Fallback | Per-call cost |
+|---|---|---|---|
+| `embed` | Ollama all-minilm | — | $0 |
+| `classify` | Ollama qwen3:8b | Gemini Flash-Lite | $0 → $0.0001 |
+| `vision_describe` | Gemini Flash-Lite | GPT-4o-mini | $0.0003 |
+| `entity_extraction` | Gemini Flash | Claude Haiku | $0.001 |
+| `reason` | Claude Sonnet | GPT-4o | $0.02 |
+
+### Cost log
+
+Every call appends one JSON line to `.raven/usage.jsonl`:
+```json
+{"ts":"2026-06-09T22:14:33Z","task":"classify","model":"ollama/qwen3:8b",
+ "input_tokens":480,"output_tokens":64,"cost_usd":0.0,"fallback_used":false}
+```
+
+The Raven dashboard at `~/RavenVault/dashboard.html` reads this file (when
+wired) to show per-scan, per-model, per-task spend.
+
 ## Deployment Topology
 
 ```mermaid

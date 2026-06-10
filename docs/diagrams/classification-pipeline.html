@@ -151,7 +151,57 @@ flowchart TD
 </div>
 </div>
 
-<h2>2 · HITL feedback &amp; learning loop</h2>
+<h2>2 · LiteLLM Task Router</h2>
+<div class="panel">
+<div class="mermaid">
+flowchart LR
+  subgraph stages[Pipeline stages]
+    E[embed]
+    C[classify]
+    V[vision_describe]
+    X[entity_extraction]
+    R[reason]
+  end
+  subgraph router[rex/ml/routing.py — LiteLLM]
+    YAML[(.raven/llm_routing.yaml<br/>profiles + per-task chains)]
+    GET[routing.get_model task=]
+    FB[fallback chain primary → 2nd]
+    BG[max_cost_per_call_usd guard]
+    YAML --> GET --> FB
+    GET --> BG
+  end
+  subgraph providers[Providers via LiteLLM]
+    OL[Ollama qwen3 · all-minilm]
+    GE[Gemini Flash / Flash-Lite]
+    CL[Claude Haiku / Sonnet]
+    OP[OpenAI GPT-4o / mini]
+    BR[AWS Bedrock]
+    GR[Groq]
+  end
+  subgraph log[Observability]
+    UL[.raven/usage.jsonl<br/>per-call cost + tokens + task + model]
+  end
+  stages --> router
+  router --> providers
+  providers --> log
+
+  classDef built fill:#56d364,color:#000;
+  classDef build fill:#ffa657,color:#000;
+  class stages built;
+  class router,providers,log build;
+</div>
+</div>
+
+<table>
+<tr><th>Task</th><th>Primary (balanced)</th><th>Fallback</th><th>$ per call</th></tr>
+<tr><td>embed</td><td>Ollama all-minilm</td><td>—</td><td>$0</td></tr>
+<tr><td>classify</td><td>Ollama qwen3:8b</td><td>Gemini Flash-Lite</td><td>$0 → $0.0001</td></tr>
+<tr><td>vision_describe</td><td>Gemini Flash-Lite</td><td>GPT-4o-mini</td><td>$0.0003</td></tr>
+<tr><td>entity_extraction</td><td>Gemini Flash</td><td>Claude Haiku</td><td>$0.001</td></tr>
+<tr><td>reason</td><td>Claude Sonnet</td><td>GPT-4o</td><td>$0.02</td></tr>
+</table>
+
+<h2>3 · HITL feedback &amp; learning loop</h2>
 <div class="panel">
 <div class="mermaid">
 flowchart LR
@@ -180,7 +230,7 @@ flowchart LR
 </div>
 </div>
 
-<h2>3 · Drift &amp; lifecycle</h2>
+<h2>4 · Drift &amp; lifecycle</h2>
 <div class="panel">
 <div class="mermaid">
 flowchart TD
@@ -199,7 +249,7 @@ flowchart TD
 </div>
 </div>
 
-<h2>4 · Module layout (proposed)</h2>
+<h2>5 · Module layout</h2>
 <div class="panel">
 <pre style="color:#e6edf3; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; line-height: 1.6;">
 src/rex/ml/
@@ -225,7 +275,7 @@ src/rex/ml/
 </pre>
 </div>
 
-<h2>5 · Per-domain config example</h2>
+<h2>6 · Per-domain config example</h2>
 <div class="panel">
 <pre style="color:#e6edf3; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; line-height: 1.6;">
 <span style="color:#ffa657"># .raven/classifier_config.yaml</span>
@@ -256,7 +306,7 @@ drift:
 </pre>
 </div>
 
-<h2>6 · Build status snapshot</h2>
+<h2>7 · Build status snapshot</h2>
 <table>
 <tr><th>Component</th><th>Status</th><th>Where</th></tr>
 <tr><td>Fingerprint stage</td><td><span class="pill ok">Built</span></td><td>rex/agents/scanner.py</td></tr>

@@ -27,6 +27,8 @@ dependencies = [
     "ollama>=0.4",
     "google-genai>=1.0",
     "pillow>=11.0",
+    "litellm>=1.50.0",                  # unified LLM router across providers
+    "pyyaml>=6.0",                      # llm_routing.yaml loader
 
     # Vector stores
     "lancedb>=0.13",
