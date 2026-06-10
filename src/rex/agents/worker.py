@@ -19,9 +19,13 @@ from rex.agents.scanner import LocalScanner
 from rex.config import Settings, VisionProvider, get_settings
 from rex.ml.provider import ModelProvider
 from rex.ml.vision import VisionEngine
+from rex.models.schemas import JobStatus
+from rex.orchestrator.pipeline_dispatch import dispatch_stage3
+from rex.orchestrator.pipeline_progress import PipelineProgress
 from rex.orchestrator.state import JobStore
 from rex.planner.model import Batch, BatchFile, ScanPlan
 from rex.preflight.intent import ScanIntent
+from rex.projects.context_store import ContextStore
 from rex.projects.model import Project
 from rex.vectorstore.lancedb_store import LanceDBStore
 
@@ -116,20 +120,29 @@ class RexWorker:
                 logger.error("worker_route_failed", file=ctx.file_record.filename, error=str(e)[:120])
             await asyncio.sleep(0.02)
 
-        # Stage 3: Organize
-        for ctx in contexts:
-            d = decisions.get(ctx.file_record.id)
-            if d is None:
-                continue
-            try:
-                await self.organizer.organize(ctx.file_record, d, self.project.output_path)
-            except Exception as e:
-                logger.error("worker_organize_failed", file=ctx.file_record.filename, error=str(e)[:120])
-
+        # Stage 3: Dispatch (SortEngine if BusinessContext else legacy). Counts.
+        progress = PipelineProgress(job_id=job.id, status=JobStatus.ORGANIZING)
+        progress.organized = 0
+        cs = ContextStore()
+        bc = cs.get_for_project(self.project.root_path) or cs.get_for_project()
+        bc = bc if (bc and bc.domains) else None
+        attempted = sum(1 for c in contexts if decisions.get(c.file_record.id))
+        async def _noemit(p): pass
+        try:
+            status = await dispatch_stage3(
+                business_context=bc, organizer=self.organizer, contexts=contexts,
+                decisions=decisions, output_path=self.project.output_path,
+                progress=progress, emit=_noemit,
+                job_store=self.job_store, job_id=job.id,
+            )
+        except Exception as e:
+            logger.error("worker_dispatch_failed", error=str(e)[:200])
+            status = JobStatus.FAILED
         logger.info(
-            "worker_batch_complete",
-            worker=self.worker_id, batch=batch.id,
+            "worker_batch_complete", worker=self.worker_id, batch=batch.id,
             scanned=len(contexts), routed=len(decisions),
+            organized=progress.organized, organize_failed=attempted - progress.organized,
+            status=getattr(status, 'value', str(status)), sort_engine=bool(bc),
         )
 
     async def close(self) -> None:

@@ -42,19 +42,47 @@ class Janitor(_JanitorOps):
     # --- Trigger entry points ---
 
     async def on_complete(self, project: Project, plan_id: str) -> dict:
-        """Called after coordinator completes successfully."""
+        """Called after coordinator completes successfully.
+
+        Verifies disk state before reporting success — counts actual files
+        at project.output_path. If zero files landed, returns verdict
+        'no_writes' so the caller can flag the run as broken (instead of
+        echoing a misleading success message).
+        """
         logger.info("janitor_on_complete", project=project.name, plan=plan_id)
         merged_rows = await self._merge_shards(project)
         compact = await self._compact_vectors(project)
         finalized = await self._finalize_catalog(project, plan_id)
         cleaned = await self._cleanup_temp(project)
+        wrote_files, verdict = self._verify_output(project)
         return {
             "trigger": JanitorTrigger.ON_COMPLETE.value,
             "merged_rows": merged_rows,
             "compacted": compact,
             "catalog_finalized": finalized,
             "temp_cleaned": cleaned,
+            "wrote_files": wrote_files,
+            "output_verdict": verdict,
         }
+
+    def _verify_output(self, project: Project) -> tuple[int, str]:
+        """Walk project.output_path and count files. Return (count, verdict).
+
+        verdict in {'complete', 'no_writes', 'unreadable'}.
+        """
+        import os
+        from pathlib import Path
+        out = Path(project.output_path).expanduser()
+        try:
+            if not out.exists():
+                return 0, "no_writes"
+            count = 0
+            for _, _, files in os.walk(out):
+                count += len(files)
+            return count, ("complete" if count > 0 else "no_writes")
+        except Exception as e:
+            logger.warning("janitor_verify_failed", error=str(e)[:160])
+            return 0, "unreadable"
 
     async def on_kill(self, project: Project, plan_id: str) -> dict:
         """Called when user kills the run mid-flight."""

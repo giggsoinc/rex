@@ -32,19 +32,38 @@ def _print_plan_summary(plan) -> None:
 
 
 def _print_final_summary(project, plan, result, janitor_result) -> None:
-    """Show summary panel."""
+    """Show summary panel — uses disk truth from janitor verification."""
     cost = janitor_result.get("merged_rows", 0)
+    wrote_files = janitor_result.get("wrote_files", 0)
+    verdict = janitor_result.get("output_verdict", "complete")
+
+    # Flip success indicator based on what's actually on disk
+    if verdict == "complete" and wrote_files > 0:
+        head, border = "[bold green]✓ Scan complete[/bold green]", "green"
+    elif verdict == "no_writes":
+        head = (
+            "[bold red]⚠️  Scan ran but NOTHING was written to output[/bold red]\n"
+            "[yellow]Workers reported success but the output folder is empty.[/yellow]\n"
+            "[yellow]Likely cause: silent organize-stage failures. Check logs for "
+            "'worker_organize_failed' or 'worker_dispatch_failed'.[/yellow]"
+        )
+        border = "red"
+    else:
+        head = f"[bold yellow]⚠️  Scan finished (verdict: {verdict})[/bold yellow]"
+        border = "yellow"
+
     msg = (
-        f"[bold green]✓ Scan complete[/bold green]\n\n"
-        f"Project:    [cyan]{project.name}[/cyan]\n"
-        f"Plan:       [cyan]{plan.id}[/cyan]\n"
-        f"Batches:    {result.completed}/{result.total_batches} ok, {result.failed} failed\n"
-        f"Files:      {result.files_processed}\n"
-        f"Vectors:    {cost} merged from {plan.batch_count} shards\n"
-        f"Output:     [cyan]{project.output_path}[/cyan]\n"
-        f"Catalog:    [cyan]{project.output_path}/_catalog/overview.md[/cyan]"
+        f"{head}\n\n"
+        f"Project:         [cyan]{project.name}[/cyan]\n"
+        f"Plan:            [cyan]{plan.id}[/cyan]\n"
+        f"Batches:         {result.completed}/{result.total_batches} ok, {result.failed} failed\n"
+        f"Files processed: {result.files_processed}\n"
+        f"Files on disk:   [bold]{wrote_files}[/bold]  (verdict: {verdict})\n"
+        f"Vectors:         {cost} merged from {plan.batch_count} shards\n"
+        f"Output:          [cyan]{project.output_path}[/cyan]\n"
+        f"Catalog:         [cyan]{project.output_path}/_catalog/overview.md[/cyan]"
     )
-    console.print(Panel(msg, border_style="green"))
+    console.print(Panel(msg, border_style=border))
 
 
 def _human_size(b: int) -> str:
