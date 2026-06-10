@@ -24,29 +24,46 @@ from rich.console import Console
 
 from rex.models.schemas import JobStatus
 from rex.orchestrator.state import JobStore
+from rex.projects.store import ProjectStore
 
 console = Console()
 
 _STUCK_AFTER = timedelta(minutes=5)
 
 
-async def _pick_job(store: JobStore, requested: str | None) -> str | None:
-    """Pick a job ID to tail. If requested, validate; else use most recent active."""
-    jobs = await store.list_jobs()
+def _all_stores() -> list[JobStore]:
+    """Global job store plus every project's job store."""
+    stores = [JobStore(base_path="~/rex-data/jobs")]
+    for project in ProjectStore().list_all():
+        if project.jobs_path:
+            stores.append(JobStore(base_path=project.jobs_path))
+    return stores
+
+
+async def _pick_job(
+    stores: list[JobStore], requested: str | None
+) -> tuple[str, JobStore] | None:
+    """Pick a job to tail across all stores. Returns (job_id, owning store)."""
+    jobs: list[tuple[object, JobStore]] = []
+    for store in stores:
+        jobs.extend((j, store) for j in await store.list_jobs())
     if not jobs:
         console.print("[yellow]No jobs found.[/yellow]")
         return None
     if requested and requested != "--latest":
-        for j in jobs:
+        for j, store in jobs:
             if j.id == requested or j.id.startswith(requested):
-                return j.id
+                return j.id, store
         console.print(f"[red]No job matching '{requested}'.[/red]")
         return None
     # Pick most-recent non-terminal job, or just most recent overall
-    for j in jobs:
+    jobs.sort(
+        key=lambda pair: pair[0].last_progress_at or pair[0].created_at, reverse=True
+    )
+    for j, store in jobs:
         if j.status not in (JobStatus.COMPLETE, JobStatus.FAILED):
-            return j.id
-    return jobs[0].id
+            return j.id, store
+    return jobs[0][0].id, jobs[0][1]
 
 
 def _status_line(job, prev_signature: str) -> tuple[str, str]:
@@ -104,11 +121,11 @@ def main(argv: list[str]) -> int:
         return 0
 
     requested = argv[0] if argv else None
-    store = JobStore(base_path="~/rex-data/jobs")
 
-    job_id = asyncio.run(_pick_job(store, requested))
-    if job_id is None:
+    picked = asyncio.run(_pick_job(_all_stores(), requested))
+    if picked is None:
         return 1
+    job_id, store = picked
 
     console.print(f"[cyan]Tailing job: {job_id}[/cyan] (Ctrl-C to exit)\n")
     try:
