@@ -69,3 +69,7 @@ rex-data/
 
 # Session handshake — local snapshot, not committed
 HANDSHAKE.md
+
+# Rex runtime/user data — never commit
+GG_Vec_Output/
+.raven/business_context.json
