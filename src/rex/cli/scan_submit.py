@@ -13,12 +13,11 @@ from pathlib import Path
 
 from rich.console import Console
 
+from rex.config import get_settings
 from rex.orchestrator.job_control import clear_cancel, job_dir_for, write_pid
 from rex.projects.model import Project
 
 console = Console()
-
-STREAMLIT_URL = "http://localhost:8501"
 
 
 def submit_background(
@@ -50,7 +49,8 @@ def submit_background(
 
     job_id = job_dir.name
     console.print(f"🚀 [bold green]Scan submitted to background[/bold green] — job [cyan]{job_id}[/cyan] (pid {proc.pid})")
-    console.print(f"📊 Follow live: [link={STREAMLIT_URL}]{STREAMLIT_URL}[/link]  (Jobs page)")
+    ui_url = get_settings().ui_url
+    console.print(f"📊 Follow live: [link={ui_url}]{ui_url}[/link]  (Jobs page)")
     console.print("⚠️  [yellow]Please don't shut down this machine until the job completes.[/yellow]")
     console.print(f"🪵 Logs: [dim]{log_file}[/dim]")
     console.print(f"🛑 Kill anytime: [cyan]rex jobs kill {job_id}[/cyan]  (or the ⏹ button in the UI)")

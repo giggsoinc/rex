@@ -91,6 +91,12 @@ class Settings(BaseSettings):
     secret_compartment_id: str = ""             # OCI compartment OCID
     secret_project_id: str = ""                 # GCP project ID
 
+    # UI
+    ui_url: str = Field(
+        default="http://localhost:8501",
+        description="Streamlit UI base URL shown in job-follow links",
+    )
+
     # Logging
     log_level: str = "INFO"
     log_format: Literal["json", "pretty"] = "pretty"
