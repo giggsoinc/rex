@@ -127,4 +127,9 @@ def get_settings() -> Settings:
             or os.environ.get("GOOGLE_API_KEY")
             or ""
         )
+    # LiteLLM (routing layer) reads GEMINI_API_KEY from the environment —
+    # hang the key on that hook too. setdefault: an explicitly exported
+    # shell var still wins over file config.
+    if s.gemini_api_key:
+        os.environ.setdefault("GEMINI_API_KEY", s.gemini_api_key)
     return s

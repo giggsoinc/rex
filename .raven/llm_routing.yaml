@@ -22,26 +22,26 @@ tasks:
     max_cost_per_call_usd: null
 
   classify:
-    primary: gemini/gemini-2.0-flash-lite
+    primary: gemini/gemini-2.5-flash-lite
     fallback:
-      - gemini/gemini-2.0-flash
+      - gemini/gemini-2.5-flash
       - ollama/qwen3:8b               # local last-resort if Gemini is down
     max_cost_per_call_usd: 0.001
 
   vision_describe:
-    primary: gemini/gemini-2.0-flash-lite
+    primary: gemini/gemini-2.5-flash-lite
     fallback:
-      - gemini/gemini-2.0-flash
+      - gemini/gemini-2.5-flash
     max_cost_per_call_usd: 0.005
 
   entity_extraction:
-    primary: gemini/gemini-2.0-flash
+    primary: gemini/gemini-2.5-flash
     fallback:
-      - gemini/gemini-2.0-flash-lite
+      - gemini/gemini-2.5-flash-lite
     max_cost_per_call_usd: 0.01
 
   reason:
-    primary: gemini/gemini-2.0-flash
+    primary: gemini/gemini-2.5-flash
     fallback:
-      - gemini/gemini-2.0-flash-lite
+      - gemini/gemini-2.5-flash-lite
     max_cost_per_call_usd: 0.10
