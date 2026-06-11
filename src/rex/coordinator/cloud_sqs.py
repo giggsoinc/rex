@@ -28,6 +28,7 @@ class SqsCoordinator(Coordinator):
         project: Project,
         intent: ScanIntent,
         max_concurrency: int = 4,
+        cancel_event=None,
     ) -> CoordinatorResult:
         raise NotImplementedError(
             "SqsCoordinator is on the roadmap. Use mode='asyncio' or 'mp' locally for now."

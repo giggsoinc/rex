@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import multiprocessing as mp
+import threading
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
@@ -34,6 +35,11 @@ def _worker_entry(
     Returns: (batch_id, status, error_string)
     """
     import json
+    import signal
+
+    # Ctrl+C signals the whole process group — children must not die mid-file.
+    # The parent decides shutdown via cancel_event; we only stop when told.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
     from rex.agents.worker import RexWorker
     from rex.planner.model import Batch, ScanPlan
     from rex.preflight.intent import ScanIntent
@@ -68,6 +74,7 @@ class LocalMultiprocessCoordinator(Coordinator):
         project: Project,
         intent: ScanIntent,
         max_concurrency: int = 4,
+        cancel_event: threading.Event | None = None,
     ) -> CoordinatorResult:
         # Serialize once
         plan_json = plan.model_dump_json()
@@ -78,6 +85,7 @@ class LocalMultiprocessCoordinator(Coordinator):
 
         def _submit_all() -> dict:
             results: dict[str, tuple[str, str]] = {}
+            cancelled = False
             ctx = mp.get_context("spawn")  # safer than fork on macOS
             with ProcessPoolExecutor(
                 max_workers=max_concurrency,
@@ -91,6 +99,12 @@ class LocalMultiprocessCoordinator(Coordinator):
                     for b in plan.batches
                 }
                 for fut in as_completed(futures):
+                    if cancel_event is not None and cancel_event.is_set() and not cancelled:
+                        cancelled = True
+                        n = sum(1 for f in futures if f.cancel())
+                        logger.warning("coordinator_cancelled", pending_batches_cancelled=n)
+                    if fut.cancelled():
+                        continue
                     try:
                         batch_id, status, err = fut.result()
                         results[batch_id] = (status, err)
@@ -103,11 +117,14 @@ class LocalMultiprocessCoordinator(Coordinator):
 
         completed = sum(1 for s, _ in results.values() if s == "complete")
         failed = sum(1 for s, _ in results.values() if s == "failed")
+        skipped = len(plan.batches) - len(results)
         files = sum(b.count for b in plan.batches if results.get(b.id, ("?", ""))[0] == "complete")
 
-        # Update batch statuses on the plan
+        # Update batch statuses on the plan; cancelled batches stay PENDING (resumable)
         for b in plan.batches:
-            status, err = results.get(b.id, ("failed", "no result"))
+            if b.id not in results:
+                continue
+            status, err = results[b.id]
             b.status = BatchStatus.COMPLETE if status == "complete" else BatchStatus.FAILED
             b.error = err or None
             b.completed_at = datetime.utcnow()
@@ -117,6 +134,6 @@ class LocalMultiprocessCoordinator(Coordinator):
             total_batches=len(plan.batches),
             completed=completed,
             failed=failed,
-            skipped=0,
+            skipped=skipped,
             files_processed=files,
         )

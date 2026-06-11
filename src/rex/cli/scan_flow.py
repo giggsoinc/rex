@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import signal
 import sys
+import threading
 from pathlib import Path
 
 from rich.console import Console
@@ -84,26 +85,44 @@ async def _run(
     coordinator = get_coordinator(mode)
     console.print(f"\n[bold cyan]Executing with {coordinator.name()} ({workers} workers)…[/bold cyan]")
 
-    # Wire SIGINT to janitor on_kill
+    # Wire SIGINT: first Ctrl+C drains gracefully, second force-quits
     janitor = Janitor(settings)
-    kill_handled = asyncio.Event()
+    cancel_event = threading.Event()
+    prev_handler = signal.getsignal(signal.SIGINT)
 
     def _kill_handler(signum, frame):
-        if not kill_handled.is_set():
-            kill_handled.set()
-            console.print("\n[yellow]Kill signal received — janitor will clean up after current batches[/yellow]")
+        if not cancel_event.is_set():
+            cancel_event.set()
+            console.print(
+                "\n[yellow]Ctrl+C — finishing in-flight batches, skipping the rest. "
+                "Press Ctrl+C again to force quit.[/yellow]"
+            )
+        else:
+            signal.signal(signal.SIGINT, prev_handler)
+            raise KeyboardInterrupt
     signal.signal(signal.SIGINT, _kill_handler)
 
     try:
-        result = await coordinator.run_plan(plan, project, intent, max_concurrency=workers)
+        result = await coordinator.run_plan(
+            plan, project, intent, max_concurrency=workers, cancel_event=cancel_event,
+        )
+    except KeyboardInterrupt:
+        import os
+        console.print("[red]Force quit — checkpointing what we can…[/red]")
+        await janitor.on_kill(project, plan.id)
+        # os._exit skips the ProcessPoolExecutor atexit join that would
+        # otherwise block exit until every child finishes its batch.
+        os._exit(130)
     except Exception as e:
         console.print(f"[red]Coordinator failed:[/red] {e}")
         await janitor.on_crash(project, plan.id, error=str(e))
         return 5
+    finally:
+        signal.signal(signal.SIGINT, prev_handler)
 
     # 6. Janitor — merge shards + finalize catalog
     console.print("\n[bold cyan]Janitor cleanup…[/bold cyan]")
-    if kill_handled.is_set():
+    if cancel_event.is_set():
         jres = await janitor.on_kill(project, plan.id)
     else:
         jres = await janitor.on_complete(project, plan.id)

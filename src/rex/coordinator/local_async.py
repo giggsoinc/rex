@@ -6,6 +6,7 @@ Fastest startup, single-process. Best for laptops with limited RAM.
 from __future__ import annotations
 
 import asyncio
+import threading
 from datetime import datetime
 
 import structlog
@@ -31,6 +32,7 @@ class LocalAsyncCoordinator(Coordinator):
         project: Project,
         intent: ScanIntent,
         max_concurrency: int = 4,
+        cancel_event: threading.Event | None = None,
     ) -> CoordinatorResult:
         sem = asyncio.Semaphore(max_concurrency)
         worker = RexWorker(project=project, intent=intent)
@@ -38,6 +40,8 @@ class LocalAsyncCoordinator(Coordinator):
 
         async def run_one(batch: Batch) -> Batch:
             async with sem:
+                if cancel_event is not None and cancel_event.is_set():
+                    return batch  # stays PENDING — resumable on next run
                 batch.status = BatchStatus.IN_PROGRESS
                 batch.started_at = datetime.utcnow()
                 try:
@@ -54,6 +58,7 @@ class LocalAsyncCoordinator(Coordinator):
 
         completed = sum(1 for b in results if b.status == BatchStatus.COMPLETE)
         failed = sum(1 for b in results if b.status == BatchStatus.FAILED)
+        skipped = sum(1 for b in results if b.status == BatchStatus.PENDING)
         files = sum(b.count for b in results if b.status == BatchStatus.COMPLETE)
 
         return CoordinatorResult(
@@ -61,6 +66,6 @@ class LocalAsyncCoordinator(Coordinator):
             total_batches=len(plan.batches),
             completed=completed,
             failed=failed,
-            skipped=0,
+            skipped=skipped,
             files_processed=files,
         )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -40,10 +41,14 @@ class Coordinator(ABC):
         project: Project,
         intent: ScanIntent,
         max_concurrency: int = 4,
+        cancel_event: threading.Event | None = None,
     ) -> CoordinatorResult:
         """Execute a ScanPlan by dispatching batches to workers.
 
-        Returns when all batches complete (or are abandoned).
+        Returns when all batches complete (or are abandoned). When
+        cancel_event is set mid-run, in-flight batches finish but no new
+        batches start; unstarted batches stay PENDING and are counted in
+        CoordinatorResult.skipped.
         """
         ...
 

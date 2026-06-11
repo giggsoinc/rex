@@ -24,6 +24,7 @@ class PrefectCoordinator(Coordinator):
         project: Project,
         intent: ScanIntent,
         max_concurrency: int = 4,
+        cancel_event=None,
     ) -> CoordinatorResult:
         raise NotImplementedError(
             "PrefectCoordinator is on the roadmap. Use mode='asyncio' or 'mp' locally for now."

@@ -23,6 +23,7 @@ class K8sCoordinator(Coordinator):
         project: Project,
         intent: ScanIntent,
         max_concurrency: int = 4,
+        cancel_event=None,
     ) -> CoordinatorResult:
         raise NotImplementedError(
             "K8sCoordinator is on the roadmap. Use mode='asyncio' or 'mp' locally for now."
