@@ -1,79 +1,66 @@
-"""Scan page — point Rex at a folder and run the pipeline."""
+"""Scan page — submit a background scan (same detach path as `rex scan`).
+
+The pipeline never runs inside the Streamlit process: submission spawns a
+detached child, shows a toast, and progress lives on the 📊 Jobs page.
+"""
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 
 import streamlit as st
 
-from rex.orchestrator.builder import build_default_pipeline
 from rex.projects.context_store import ContextStore
+from rex.projects.store import ProjectStore
 
 
 def page_scan() -> None:
-    """Scan page — point at a folder, run pipeline."""
+    """Submit a scan to the background and point at the Jobs page."""
     st.title("📁 Scan")
-    st.write("Point Rex at a folder. It will scan, classify, dedupe, and organize.")
-
-    folder = st.text_input("Folder path", value=str(Path.home() / "Downloads"))
-    output = st.text_input(
-        "Output path",
-        value=str(Path.home() / "rex-data" / "output"),
-        help=(
-            "Where Rex will write organized output (it will not modify your source folder). "
-            "This path is HONORED — it overrides project defaults and REX_STORAGE_PATH."
-        ),
+    st.write(
+        "Point Rex at a folder. The scan runs in the **background** — "
+        "follow it on the 📊 Jobs page, kill it anytime."
     )
-    name = st.text_input("Job name (optional)", value="")
+
+    projects = ProjectStore().list_all()
+    if not projects:
+        st.error("No projects yet — create one first: `rex project create <name>` "
+                 "or use 🚀 Onboard.")
+        return
+    proj_by_name = {p.name: p for p in projects}
+    proj_name = st.selectbox("Project", options=list(proj_by_name))
+    project = proj_by_name[proj_name]
+
+    folder = st.text_input("Folder to scan", value=str(Path.home() / "Downloads"))
+    output = st.text_input(
+        "Output path (blank = project default)", value=project.output_path or "",
+        help="Overrides the project's output path for this run.",
+    )
+    workers = st.slider("Workers", min_value=1, max_value=8, value=4)
 
     # Show whether SortEngine will be active (BusinessContext present)
-    ctx = ContextStore().get_for_project()
+    ctx = ContextStore().get_for_project(project.root_path) or ContextStore().get_for_project()
     if ctx and ctx.domains:
-        st.info(
-            f"🎯 SortEngine active — domains: **{', '.join(ctx.domains)}**. "
-            f"Threshold {ctx.confidence_threshold}. Output uses Domain/Type taxonomy."
-        )
+        st.info(f"🎯 SortEngine active — domains: **{', '.join(ctx.domains)}**.")
     else:
-        st.warning(
-            "⚠️ No BusinessContext set — using **legacy organizer** "
-            "(type-only folders). Visit 🚀 Onboard first for Domain/Type sorting."
-        )
+        st.warning("⚠️ No BusinessContext — legacy type-only folders. Visit 🚀 Onboard.")
 
-    if st.button("Start scan", type="primary"):
+    if st.button("🚀 Submit scan", type="primary"):
         src = Path(folder).expanduser()
         if not src.exists() or not src.is_dir():
             st.error(f"Folder not found: {src}")
             return
-
-        progress_bar = st.progress(0, text="Initializing…")
-        status_box = st.empty()
-        stats_cols = st.columns(5)
-
-        async def run():
-            pipeline = build_default_pipeline()
-
-            async def on_progress(p):
-                total = max(p.total, 1)
-                done = max(p.organized, p.routed, p.scanned)
-                progress_bar.progress(min(done / total, 1.0), text=f"{p.status.value} · {p.current_file[:60]}")
-                with stats_cols[0]:
-                    st.metric("Total", p.total)
-                with stats_cols[1]:
-                    st.metric("Scanned", p.scanned)
-                with stats_cols[2]:
-                    st.metric("Routed", p.routed)
-                with stats_cols[3]:
-                    st.metric("Organized", p.organized)
-                with stats_cols[4]:
-                    st.metric("Duplicates", p.duplicates)
-
-            pipeline.on_progress = on_progress
-            return await pipeline.run(str(src), output_path=output, name=name)
-
-        try:
-            job = asyncio.run(run())
-            status_box.success(f"Done! Job {job.id} — {job.organized_files} files organized.")
-            st.session_state.last_job_id = job.id
-        except Exception as e:
-            status_box.error(f"Pipeline failed: {e}")
+        from rex.cli.scan_submit import submit_background
+        out_override = output.strip() or None
+        if out_override == project.output_path:
+            out_override = None
+        submit_background(
+            src.resolve(), project, workers=workers, mode="asyncio",
+            soft=True, output_override=out_override,
+        )
+        st.toast(f"Scan submitted for {project.name} — running in background.", icon="🚀")
+        st.success(
+            "🚀 **Scan submitted.** Track stage, ETA, and kill it from the "
+            "**📊 Jobs** page (left sidebar). Don't shut the machine down "
+            "until it completes."
+        )
