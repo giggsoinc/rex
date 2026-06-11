@@ -23,12 +23,24 @@ def banner() -> None:
 
 
 def write_env(config: dict, target_path: Path) -> None:
-    """Write configuration to .env file."""
-    lines = ["# Rex — Onboarding-generated config\n"]
+    """Write configuration to .env file, merging with existing values.
+
+    Keys the wizard doesn't ask about (REX_EMBED_MODEL, API keys added by
+    hand, ...) must survive a `rex init` rerun — never clobber the file.
+    """
+    merged: dict[str, str] = {}
+    if target_path.exists():
+        for line in target_path.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                merged[k.strip()] = v.strip()
     for key, value in config.items():
         # All-caps keys are raw env vars (LiteLLM API keys like OPENAI_API_KEY)
         env_key = key if key.isupper() else f"REX_{key.upper()}"
-        lines.append(f"{env_key}={value}")
+        merged[env_key] = str(value)
+    lines = ["# Rex — Onboarding-generated config\n"]
+    lines += [f"{k}={v}" for k, v in merged.items()]
     target_path.write_text("\n".join(lines) + "\n")
 
 

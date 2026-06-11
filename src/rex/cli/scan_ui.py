@@ -36,9 +36,18 @@ def _print_final_summary(project, plan, result, janitor_result) -> None:
     cost = janitor_result.get("merged_rows", 0)
     wrote_files = janitor_result.get("wrote_files", 0)
     verdict = janitor_result.get("output_verdict", "complete")
+    killed = janitor_result.get("trigger") == "on_kill"
 
     # Flip success indicator based on what's actually on disk
-    if verdict == "complete" and wrote_files > 0:
+    if killed:
+        skipped = result.total_batches - result.completed - result.failed
+        head = (
+            f"[bold yellow]🛑 Scan KILLED — partial run[/bold yellow]\n"
+            f"[yellow]{result.completed} batches finished, {skipped} skipped "
+            f"(stay pending — rerun the same scan to resume).[/yellow]"
+        )
+        border, verdict = "yellow", "killed"
+    elif verdict == "complete" and wrote_files > 0:
         head, border = "[bold green]✓ Scan complete[/bold green]", "green"
     elif verdict == "no_writes":
         head = (

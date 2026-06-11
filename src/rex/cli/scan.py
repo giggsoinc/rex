@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     if not argv:
         console.print(
             "[red]Usage:[/red] rex scan <folder> [--project <name>] "
-            "[--output <path>] [--workers N] [--mode asyncio|mp] [--soft] [--bg]"
+            "[--output <path>] [--workers N] [--mode asyncio|mp] [--soft] [--fg]"
         )
         return 1
 
@@ -39,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
     mode = "asyncio"
     soft = False
     yes = False
-    bg = False
+    bg = True   # background by default — use --fg for the old inline flow
 
     i = 1
     while i < len(argv):
@@ -58,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
             yes = True; i += 1
         elif a == "--bg":
             bg = True; i += 1
+        elif a == "--fg":
+            bg = False; i += 1
         else:
             i += 1
 

@@ -32,7 +32,7 @@ def submit_background(
     cmd = [
         sys.executable, "-m", "rex.cli.main", "scan", str(src_path),
         "--project", project.name, "--workers", str(workers),
-        "--mode", mode, "-y",
+        "--mode", mode, "-y", "--fg",  # child must run inline, not re-submit
     ]
     if soft:
         cmd.append("--soft")
