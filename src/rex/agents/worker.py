@@ -16,6 +16,7 @@ import structlog
 from rex.agents.organizer import LocalOrganizer
 from rex.agents.router import LLMRouter
 from rex.agents.scanner import LocalScanner
+from rex.agents.worker_stages import route_contexts, scan_batch_files
 from rex.config import Settings, VisionProvider, get_settings
 from rex.ml.provider import ModelProvider
 from rex.ml.vision import VisionEngine
@@ -94,31 +95,17 @@ class RexWorker:
             files=batch.count,
         )
 
-        # Stage 1: Scan + embed each file in the batch
-        contexts = []
-        for bf in batch.files:
-            try:
-                ctx = await self.scanner._process_one(bf.path, job.id)
-                if ctx is not None:
-                    contexts.append(ctx)
-            except Exception as e:
-                logger.warning("worker_scan_skip", file=bf.path, error=str(e)[:120])
-
-        # Stage 2: Route (LLM classify + dedup)
-        decisions = {}
-        for ctx in contexts:
-            # Idempotency
-            existing = await self.job_store.get_decision(job.id, ctx.file_record.id)
-            if existing is not None:
-                decisions[ctx.file_record.id] = existing
-                continue
-            try:
-                decision = await self.router.route(ctx)
-                await self.job_store.save_decision(ctx.file_record.id, job.id, decision)
-                decisions[ctx.file_record.id] = decision
-            except Exception as e:
-                logger.error("worker_route_failed", file=ctx.file_record.filename, error=str(e)[:120])
-            await asyncio.sleep(0.02)
+        # Stages 1+2: scan + route, each per-file step timeout-bounded
+        timeout = self.settings.file_timeout_seconds
+        contexts, scan_skipped = await scan_batch_files(
+            scanner=self.scanner, job_store=self.job_store,
+            batch=batch, job_id=job.id, timeout=timeout,
+        )
+        decisions, route_skipped = await route_contexts(
+            router=self.router, job_store=self.job_store,
+            contexts=contexts, job_id=job.id, timeout=timeout,
+        )
+        skipped = scan_skipped + route_skipped
 
         # Stage 3: Dispatch (SortEngine if BusinessContext else legacy). Counts.
         progress = PipelineProgress(job_id=job.id, status=JobStatus.ORGANIZING)
@@ -142,6 +129,7 @@ class RexWorker:
             "worker_batch_complete", worker=self.worker_id, batch=batch.id,
             scanned=len(contexts), routed=len(decisions),
             organized=progress.organized, organize_failed=attempted - progress.organized,
+            skipped_timeout=skipped + progress.skipped,
             status=getattr(status, 'value', str(status)), sort_engine=bool(bc),
         )
 

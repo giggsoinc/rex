@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     dedup_related_threshold: float = Field(default=0.80)
     batch_size: int = Field(default=10)
     ollama_parallel: int = Field(default=4)
+    file_timeout_seconds: float = Field(
+        default=120.0,
+        description="Per-file timeout for scan/route/sort steps; timed-out files are skipped",
+    )
 
     # Secret provider
     secret_provider: str = "file"

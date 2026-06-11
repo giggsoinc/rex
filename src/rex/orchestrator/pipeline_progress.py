@@ -21,6 +21,7 @@ class PipelineProgress:
     routed: int = 0
     organized: int = 0
     duplicates: int = 0
+    skipped: int = 0
     categories: list[str] = field(default_factory=list)
     current_file: str = ""
     error: str = ""
