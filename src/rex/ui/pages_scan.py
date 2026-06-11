@@ -54,13 +54,20 @@ def page_scan() -> None:
         out_override = output.strip() or None
         if out_override == project.output_path:
             out_override = None
-        submit_background(
+        rc = submit_background(
             src.resolve(), project, workers=workers, mode="asyncio",
             soft=True, output_override=out_override,
         )
+        if rc != 0:
+            st.warning(
+                "⚠️ A scan for this folder is **already running** — follow it "
+                "on the 📊 Jobs page, or kill it there first."
+            )
+            return
         st.toast(f"Scan submitted for {project.name} — running in background.", icon="🚀")
         st.success(
             "🚀 **Scan submitted.** Track stage, ETA, and kill it from the "
             "**📊 Jobs** page (left sidebar). Don't shut the machine down "
-            "until it completes."
+            "until it completes. Re-running a finished folder is safe — "
+            "already-scanned files are skipped (hash idempotency)."
         )

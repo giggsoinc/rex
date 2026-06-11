@@ -14,7 +14,13 @@ from pathlib import Path
 from rich.console import Console
 
 from rex.config import get_settings
-from rex.orchestrator.job_control import clear_cancel, job_dir_for, write_pid
+from rex.orchestrator.job_control import (
+    clear_cancel,
+    job_dir_for,
+    pid_alive,
+    read_pid,
+    write_pid,
+)
 from rex.projects.model import Project
 
 console = Console()
@@ -27,6 +33,18 @@ def submit_background(
     """Detach the scan, print toasts + follow link, exit immediately."""
     job_dir = job_dir_for(project.jobs_path, str(src_path))
     job_dir.mkdir(parents=True, exist_ok=True)
+
+    # Duplicate guard — same source already being scanned by a live process
+    old_pid = read_pid(job_dir)
+    if old_pid is not None and pid_alive(old_pid):
+        console.print(
+            f"[yellow]⚠️  A scan for this folder is already running[/yellow] "
+            f"(job {job_dir.name}, pid {old_pid}).\n"
+            f"Follow it on the Jobs page, or stop it first: "
+            f"[cyan]rex jobs kill {job_dir.name}[/cyan]"
+        )
+        return 3
+
     clear_cancel(job_dir)
     log_file = job_dir / "scan.log"
 
