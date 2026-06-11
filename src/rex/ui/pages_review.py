@@ -21,10 +21,11 @@ __all__ = ["page_review"]
 
 def _resolve_output() -> Path | None:
     """Resolve the output folder to triage — session > input."""
+    from rex.ui.state import default_output_path
     default = st.session_state.get("review_output_path", "")
     output = st.text_input(
         "Output folder to review",
-        value=default or str(Path("~/rex-data/test-run-1").expanduser()),
+        value=default or default_output_path(),
         help="Point at the root of a Rex scan (the folder with INDEX.md).",
     )
     if not output:

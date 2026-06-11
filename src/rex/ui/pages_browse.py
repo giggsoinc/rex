@@ -6,22 +6,21 @@ import asyncio
 
 import streamlit as st
 
-from rex.ui.state import get_store
+from rex.ui.state import get_all_jobs
 
 
 def page_browse() -> None:
     """Browse organized output."""
     st.title("🗂️ Browse")
-    store = get_store()
-    jobs = asyncio.run(store.list_jobs())
+    job_pairs = get_all_jobs()
 
-    if not jobs:
+    if not job_pairs:
         st.info("No scans yet.")
         return
 
-    job_options = {f"{j.name} ({j.id[:12]})": j.id for j in jobs}
+    job_options = {f"{j.name} ({j.id[:12]})": (j.id, s) for j, s in job_pairs}
     selected = st.selectbox("Select job", options=list(job_options.keys()))
-    job_id = job_options[selected]
+    job_id, store = job_options[selected]
 
     files = asyncio.run(store.list_files(job_id))
     decisions = asyncio.run(store.list_decisions(job_id))

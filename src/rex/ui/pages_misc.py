@@ -10,7 +10,7 @@ import streamlit as st
 from rex.config import get_settings
 from rex.models.schemas import JobStatus
 from rex.ui.jobs_actions import eta_text, mark_if_crashed, render_kill_controls
-from rex.ui.state import get_store
+from rex.ui.state import get_all_jobs, get_store
 
 _STUCK_AFTER = timedelta(minutes=5)  # no heartbeat for 5+ min → stuck
 
@@ -43,16 +43,15 @@ def page_jobs() -> None:
         from time import time as _t
         st.caption(f"Last poll: {datetime.now().strftime('%H:%M:%S')}")
 
-    store = get_store()
-    jobs = asyncio.run(store.list_jobs())
+    job_pairs = get_all_jobs()
     if not show_done:
-        jobs = [j for j in jobs if j.status != JobStatus.COMPLETE]
+        job_pairs = [(j, s) for j, s in job_pairs if j.status != JobStatus.COMPLETE]
 
-    if not jobs:
+    if not job_pairs:
         st.info("No scans yet. Run one from the Scan page.")
         return
 
-    for job in jobs:
+    for job, store in job_pairs:
         from rex.cli.jobs import _find_job_dir
         job_dir = _find_job_dir(job.id)
         if job_dir is not None and mark_if_crashed(store, job, job_dir):
