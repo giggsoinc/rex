@@ -75,6 +75,8 @@ class RexWorker:
         self.router = LLMRouter(self.model, self.settings)
         self.router.project_context = project.context
         self.organizer = LocalOrganizer(self.job_store, self.settings)
+        # Shared across concurrent batches (local_async) so counters accumulate
+        self.counts: dict[str, int] = {"scanned": 0, "classified": 0}
 
     async def initialize(self) -> None:
         """One-time setup."""
@@ -89,6 +91,11 @@ class RexWorker:
             output_path=self.project.output_path,
             name=f"{plan.project_name}_{plan.id}",
         )
+        # Keep the job record honest — UI reads it (status, totals, heartbeat)
+        if job.status == JobStatus.PENDING or job.total_files != plan.total_files:
+            job.status = JobStatus.SCANNING
+            job.total_files = plan.total_files
+            await self.job_store.update_job(job)
         logger.info(
             "worker_batch_start",
             worker=self.worker_id, batch=batch.id, type=batch.type.value,
@@ -99,11 +106,11 @@ class RexWorker:
         timeout = self.settings.file_timeout_seconds
         contexts, scan_skipped = await scan_batch_files(
             scanner=self.scanner, job_store=self.job_store,
-            batch=batch, job_id=job.id, timeout=timeout,
+            batch=batch, job_id=job.id, timeout=timeout, counts=self.counts,
         )
         decisions, route_skipped = await route_contexts(
             router=self.router, job_store=self.job_store,
-            contexts=contexts, job_id=job.id, timeout=timeout,
+            contexts=contexts, job_id=job.id, timeout=timeout, counts=self.counts,
         )
         skipped = scan_skipped + route_skipped
 

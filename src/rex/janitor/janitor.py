@@ -55,6 +55,7 @@ class Janitor(_JanitorOps):
         finalized = await self._finalize_catalog(project, plan_id)
         cleaned = await self._cleanup_temp(project)
         wrote_files, verdict = self._verify_output(project)
+        await self._mark_job_complete(project, plan_id)
         return {
             "trigger": JanitorTrigger.ON_COMPLETE.value,
             "merged_rows": merged_rows,

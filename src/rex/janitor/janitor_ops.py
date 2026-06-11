@@ -13,6 +13,7 @@ from pathlib import Path
 
 import structlog
 
+from rex.janitor.janitor_marks import _JanitorMarks
 from rex.orchestrator.state import JobStore
 from rex.projects.model import Project
 from rex.vectorstore.lancedb_store import LanceDBStore
@@ -20,7 +21,7 @@ from rex.vectorstore.lancedb_store import LanceDBStore
 logger = structlog.get_logger()
 
 
-class _JanitorOps:
+class _JanitorOps(_JanitorMarks):
     """Core cleanup operations mixed into Janitor."""
 
     async def _merge_shards(self, project: Project) -> int:
@@ -105,33 +106,6 @@ class _JanitorOps:
                 except Exception as e:
                     logger.warning("janitor_temp_cleanup_failed", path=str(candidate), error=str(e))
         return cleaned
-
-    async def _mark_job_paused(self, project: Project, plan_id: str) -> None:
-        """Set job status to paused."""
-        try:
-            from rex.models.schemas import JobStatus
-            js = JobStore(base_path=project.jobs_path)
-            jobs = await js.list_jobs()
-            for j in jobs:
-                if plan_id in (j.name or "") or plan_id == j.id:
-                    j.status = JobStatus.PAUSED
-                    await js.update_job(j)
-        except Exception as e:
-            logger.warning("janitor_mark_paused_failed", error=str(e))
-
-    async def _mark_job_failed(self, project: Project, plan_id: str, error: str) -> None:
-        """Set job status to failed with error message."""
-        try:
-            from rex.models.schemas import JobStatus
-            js = JobStore(base_path=project.jobs_path)
-            jobs = await js.list_jobs()
-            for j in jobs:
-                if plan_id in (j.name or "") or plan_id == j.id:
-                    j.status = JobStatus.FAILED
-                    j.error = error[:500]
-                    await js.update_job(j)
-        except Exception as e:
-            logger.warning("janitor_mark_failed_failed", error=str(e))
 
     async def _archive_job(self, project: Project, job_id: str) -> None:
         """Move an old job folder to .archive/."""

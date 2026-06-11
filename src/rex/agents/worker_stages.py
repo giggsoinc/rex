@@ -20,10 +20,12 @@ __all__ = ["scan_batch_files", "route_contexts"]
 
 async def scan_batch_files(
     *, scanner: Any, job_store: Any, batch: Any, job_id: str, timeout: float,
+    counts: dict[str, int] | None = None,
 ) -> tuple[list[Any], int]:
     """Stage 1: scan + embed each file. Returns (contexts, skipped_count)."""
     contexts: list[Any] = []
     skipped = 0
+    counts = counts if counts is not None else {"scanned": 0, "classified": 0}
     for bf in batch.files:
         try:
             ctx = await asyncio.wait_for(
@@ -31,6 +33,10 @@ async def scan_batch_files(
             )
             if ctx is not None:
                 contexts.append(ctx)
+            counts["scanned"] += 1
+            await job_store.touch_progress(
+                job_id, current_file=bf.path, scanned=counts["scanned"]
+            )
         except asyncio.TimeoutError:
             skipped += 1
             logger.warning("worker_scan_timeout", file=bf.path, timeout_s=timeout)
@@ -42,10 +48,12 @@ async def scan_batch_files(
 
 async def route_contexts(
     *, router: Any, job_store: Any, contexts: list[Any], job_id: str, timeout: float,
+    counts: dict[str, int] | None = None,
 ) -> tuple[dict[str, Any], int]:
     """Stage 2: LLM classify + dedup. Returns (decisions, skipped_count)."""
     decisions: dict[str, Any] = {}
     skipped = 0
+    counts = counts if counts is not None else {"scanned": 0, "classified": 0}
     for ctx in contexts:
         # Idempotency
         existing = await job_store.get_decision(job_id, ctx.file_record.id)
@@ -56,6 +64,11 @@ async def route_contexts(
             decision = await asyncio.wait_for(router.route(ctx), timeout=timeout)
             await job_store.save_decision(ctx.file_record.id, job_id, decision)
             decisions[ctx.file_record.id] = decision
+            counts["classified"] += 1
+            await job_store.touch_progress(
+                job_id, current_file=ctx.file_record.filename,
+                classified=counts["classified"],
+            )
         except asyncio.TimeoutError:
             skipped += 1
             logger.warning(
