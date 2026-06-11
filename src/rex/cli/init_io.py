@@ -26,7 +26,8 @@ def write_env(config: dict, target_path: Path) -> None:
     """Write configuration to .env file."""
     lines = ["# Rex — Onboarding-generated config\n"]
     for key, value in config.items():
-        env_key = f"REX_{key.upper()}"
+        # All-caps keys are raw env vars (LiteLLM API keys like OPENAI_API_KEY)
+        env_key = key if key.isupper() else f"REX_{key.upper()}"
         lines.append(f"{env_key}={value}")
     target_path.write_text("\n".join(lines) + "\n")
 

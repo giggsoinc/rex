@@ -15,11 +15,11 @@ from rich.panel import Panel
 from rich.prompt import Confirm
 
 from rex.cli.init_io import banner, summary, verify_vector_store, write_env
+from rex.cli.init_llm import ask_llm_config
 from rex.cli.init_secrets import ask_secret_provider
 from rex.cli.init_steps import (
     ask_chroma_config,
     ask_deployment_mode,
-    ask_llm_config,
     ask_local_lancedb_config,
     ask_oracle_config,
     ask_pgvector_config,

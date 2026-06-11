@@ -106,26 +106,7 @@ def ask_shared_lancedb_config() -> dict:
     return {"vector_path": path}
 
 
-def ask_llm_config() -> dict:
-    """Ask which LLM provider to use."""
-    console.print("\n[bold]LLM Provider[/bold]\n")
-    provider = Prompt.ask(
-        "Which LLM for classification?",
-        choices=["ollama", "gemini", "bedrock"],
-        default="ollama",
-    )
-
-    if provider == "ollama":
-        endpoint = Prompt.ask("Ollama endpoint", default="http://localhost:11434")
-        model = Prompt.ask("Model", default="qwen3:8b")
-        return {"llm_provider": "ollama", "llm_endpoint": endpoint, "llm_model": model}
-    elif provider == "gemini":
-        model = Prompt.ask("Gemini model", default="gemini-3.1-flash-lite")
-        api_key = Prompt.ask("Gemini API key", password=True)
-        return {"llm_provider": "gemini", "llm_model": model, "gemini_api_key": api_key}
-    else:
-        model = Prompt.ask("Bedrock model", default="anthropic.claude-haiku-4-5-20251001")
-        return {"llm_provider": "bedrock", "llm_model": model}
+# ask_llm_config moved to init_llm.py — now offers every LiteLLM provider.
 
 
 def ask_vision_config() -> dict:

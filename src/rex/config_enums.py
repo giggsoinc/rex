@@ -12,6 +12,9 @@ class LLMProvider(str, Enum):
     GEMINI = "gemini"
     BEDROCK = "bedrock"
     OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    XAI = "xai"                 # Grok
+    PERPLEXITY = "perplexity"
 
 
 class VisionProvider(str, Enum):
