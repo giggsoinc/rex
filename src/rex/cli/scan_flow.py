@@ -16,6 +16,12 @@ from rex.cli.scan_wizard import _quick_count
 from rex.config import get_settings
 from rex.coordinator import get_coordinator
 from rex.janitor import Janitor
+from rex.orchestrator.job_control import (
+    CancelFileWatcher,
+    clear_cancel,
+    job_dir_for,
+    write_pid,
+)
 from rex.planner import Planner
 from rex.preflight import gather_intent, run_preflight
 from rex.preflight.checks import confirm_proceed, print_preflight_report
@@ -90,6 +96,13 @@ async def _run(
     cancel_event = threading.Event()
     prev_handler = signal.getsignal(signal.SIGINT)
 
+    # Cross-process kill: UI/`rex jobs kill` touch <job_dir>/CANCEL
+    job_dir = job_dir_for(project.jobs_path, str(src_path))
+    clear_cancel(job_dir)
+    write_pid(job_dir)
+    watcher = CancelFileWatcher(job_dir, cancel_event)
+    watcher.start()
+
     def _kill_handler(signum, frame):
         if not cancel_event.is_set():
             cancel_event.set()
@@ -119,6 +132,9 @@ async def _run(
         return 5
     finally:
         signal.signal(signal.SIGINT, prev_handler)
+        watcher.stop()
+        clear_cancel(job_dir)
+        (job_dir / "pid").unlink(missing_ok=True)
 
     # 6. Janitor — merge shards + finalize catalog
     console.print("\n[bold cyan]Janitor cleanup…[/bold cyan]")

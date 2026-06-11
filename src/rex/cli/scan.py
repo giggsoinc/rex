@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     if not argv:
         console.print(
             "[red]Usage:[/red] rex scan <folder> [--project <name>] "
-            "[--output <path>] [--workers N] [--mode asyncio|mp] [--soft]"
+            "[--output <path>] [--workers N] [--mode asyncio|mp] [--soft] [--bg]"
         )
         return 1
 
@@ -39,6 +39,7 @@ def main(argv: list[str] | None = None) -> int:
     mode = "asyncio"
     soft = False
     yes = False
+    bg = False
 
     i = 1
     while i < len(argv):
@@ -55,6 +56,8 @@ def main(argv: list[str] | None = None) -> int:
             soft = True; i += 1
         elif a in {"-y", "--yes"}:
             yes = True; i += 1
+        elif a == "--bg":
+            bg = True; i += 1
         else:
             i += 1
 
@@ -76,5 +79,12 @@ def main(argv: list[str] | None = None) -> int:
         project = _run_project_wizard(src_path, store)
         if project is None:
             return 0
+
+    if bg:
+        from rex.cli.scan_submit import submit_background
+        return submit_background(
+            src_path, project, workers=workers, mode=mode,
+            soft=soft, output_override=output_override,
+        )
 
     return asyncio.run(_run(src_path, project, workers, mode, soft, yes, output_override))

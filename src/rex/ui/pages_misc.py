@@ -9,6 +9,7 @@ import streamlit as st
 
 from rex.config import get_settings
 from rex.models.schemas import JobStatus
+from rex.ui.jobs_actions import eta_text, mark_if_crashed, render_kill_controls
 from rex.ui.state import get_store
 
 _STUCK_AFTER = timedelta(minutes=5)  # no heartbeat for 5+ min → stuck
@@ -52,6 +53,10 @@ def page_jobs() -> None:
         return
 
     for job in jobs:
+        from rex.cli.jobs import _find_job_dir
+        job_dir = _find_job_dir(job.id)
+        if job_dir is not None and mark_if_crashed(store, job, job_dir):
+            st.toast(f"Job {job.name} marked crashed (process died).", icon="💀")
         label = f"{job.name} — {_live_status(job)} — {job.scanned_files}/{job.total_files}"
         with st.expander(label, expanded=(job.status not in (JobStatus.COMPLETE, JobStatus.FAILED))):
             cols = st.columns(4)
@@ -60,8 +65,13 @@ def page_jobs() -> None:
             cols[2].metric("Organized", job.organized_files)
             cols[3].metric("Duplicates", job.duplicate_count)
 
+            eta = eta_text(job)
+            if eta:
+                st.caption(f"⏳ {eta}")
             if job.current_file:
                 st.caption(f"📄 Current: `{job.current_file}`")
+            if job_dir is not None:
+                render_kill_controls(job, job_dir)
             if job.last_progress_at:
                 st.caption(f"⏱  Last heartbeat: {job.last_progress_at}")
             st.caption(f"Source: `{job.source_path}`")

@@ -44,6 +44,10 @@ def main() -> int:
         from rex.cli.serve import main as serve_main
         return serve_main(sys.argv[2:])
 
+    if cmd == "jobs":
+        from rex.cli.jobs import main as jobs_main
+        return jobs_main(sys.argv[2:])
+
     if cmd == "tail":
         from rex.cli.tail import main as tail_main
         return tail_main(sys.argv[2:])
@@ -73,6 +77,7 @@ def print_help() -> None:
         "  [cyan]rex serve[/cyan]                 Start MCP server (stdio + HTTP)\n"
         "  [cyan]rex search[/cyan] <query>        Semantic search across organized files\n"
         "  [cyan]rex status[/cyan]                Show current job status\n"
+        "  [cyan]rex jobs[/cyan] [kill <id>]      List jobs / kill a running job (-f to force)\n"
         "  [cyan]rex tail[/cyan] [job_id]         Live-stream job progress (tail -f style)\n"
         "  [cyan]rex doctor[/cyan] [--strict]     Check system deps + Python libs\n"
     )
