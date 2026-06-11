@@ -26,6 +26,7 @@ def submit_background(
 ) -> int:
     """Detach the scan, print toasts + follow link, exit immediately."""
     job_dir = job_dir_for(project.jobs_path, str(src_path))
+    job_dir.mkdir(parents=True, exist_ok=True)
     clear_cancel(job_dir)
     log_file = job_dir / "scan.log"
 
