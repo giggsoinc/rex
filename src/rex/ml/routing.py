@@ -35,8 +35,12 @@ __all__ = ["LLMRouter", "get_router", "reset_router"]
 
 
 def _default_user_path() -> Path:
-    """Where users override defaults — .raven/llm_routing.yaml in CWD."""
-    return Path(".raven") / "llm_routing.yaml"
+    """User routing overrides — found CWD-independently (background jobs
+    run from arbitrary directories): $REX_ROUTING_FILE → CWD → repo root
+    → ~/.rex, falling back to the CWD-relative path if nowhere exists."""
+    from rex.config_env import find_config_file
+    found = find_config_file(".raven/llm_routing.yaml", env_var="REX_ROUTING_FILE")
+    return found if found is not None else Path(".raven") / "llm_routing.yaml"
 
 
 class LLMRouter:

@@ -48,3 +48,29 @@ def find_env_files() -> list[str]:
                 found.append(str(p))
 
     return found
+
+
+def find_config_file(relpath: str, env_var: str | None = None) -> Path | None:
+    """Locate a config file CWD-independently, same chain as find_env_files.
+
+    Search order: $env_var override → CWD → repo root → ~/.rex.
+    Returns the first existing path, or None.
+    """
+    if env_var:
+        explicit = os.environ.get(env_var)
+        if explicit and Path(explicit).expanduser().exists():
+            return Path(explicit).expanduser()
+
+    dirs: list[Path] = [Path.cwd()]
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        if (parent / "pyproject.toml").exists() or (parent / ".env.local").exists():
+            dirs.append(parent)
+            break
+    dirs.append(Path.home() / ".rex")
+
+    for d in dirs:
+        p = d / relpath
+        if p.exists():
+            return p
+    return None
