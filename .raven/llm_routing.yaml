@@ -1,0 +1,47 @@
+# Rex per-project LLM routing — merged on top of bundled routing_defaults.yaml.
+#
+# Embeddings: local nomic-embed-text (8192-token context, 768-dim, free).
+#   NOTE: embeddings are NOT swappable per-call — every vector in the index
+#   must come from the same model. Changing this requires REX_EMBED_DIM to
+#   match and a full reindex (delete the .lance store and rescan).
+#
+# Chat tasks: Gemini primary. Any LiteLLM-supported provider works as
+# primary or fallback — just add the key to the environment:
+#   gemini/<model>      → GEMINI_API_KEY        (configured)
+#   openai/<model>      → OPENAI_API_KEY        (ChatGPT)
+#   anthropic/<model>   → ANTHROPIC_API_KEY     (Claude)
+#   xai/<model>         → XAI_API_KEY           (Grok)
+#   perplexity/<model>  → PERPLEXITYAI_API_KEY  (Perplexity)
+
+active_profile: custom
+
+tasks:
+  embed:
+    primary: ollama/nomic-embed-text:latest
+    fallback: []                      # intentionally none — see note above
+    max_cost_per_call_usd: null
+
+  classify:
+    primary: gemini/gemini-2.0-flash-lite
+    fallback:
+      - gemini/gemini-2.0-flash
+      - ollama/qwen3:8b               # local last-resort if Gemini is down
+    max_cost_per_call_usd: 0.001
+
+  vision_describe:
+    primary: gemini/gemini-2.0-flash-lite
+    fallback:
+      - gemini/gemini-2.0-flash
+    max_cost_per_call_usd: 0.005
+
+  entity_extraction:
+    primary: gemini/gemini-2.0-flash
+    fallback:
+      - gemini/gemini-2.0-flash-lite
+    max_cost_per_call_usd: 0.01
+
+  reason:
+    primary: gemini/gemini-2.0-flash
+    fallback:
+      - gemini/gemini-2.0-flash-lite
+    max_cost_per_call_usd: 0.10
